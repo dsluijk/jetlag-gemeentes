@@ -1,0 +1,7 @@
+fastapi>=0.111
+uvicorn[standard]>=0.30
+sqlmodel>=0.0.21
+python-dotenv>=1.0
+
+# Only required if DATABASE_URL points at PostgreSQL instead of SQLite
+psycopg2-binary>=2.9
