@@ -59,7 +59,7 @@ class Card(SQLModel, table=True):
 
     is_wild_card: bool = Field(default=False)
 
-    updated_timestamp: datetime = Field(default_factory=datetime.now(datetime.timezone.utc))
+    updated_timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
 class Team(SQLModel, table=True):

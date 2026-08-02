@@ -1,9 +1,8 @@
 """
 Jetlag Game API - application entrypoint.
 
-This currently only wires up the app, DB startup, and a health check.
-Endpoints for Cards / Teams will be added as routers in app/routers/
-in the next step.
+Wires up the app, DB startup/table creation, and the games router
+(app/routers/games.py), plus a simple health check.
 """
 
 from contextlib import asynccontextmanager
@@ -11,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.database import init_db
+from app.routers.games import router as games_router
 
 
 @asynccontextmanager
@@ -20,6 +20,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Jetlag Game API", version="0.1.0", lifespan=lifespan)
+
+app.include_router(games_router)
 
 
 @app.get("/health")

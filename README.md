@@ -58,6 +58,83 @@ Composite primary key: `(game_id, team_color)`.
 | team_name         | str                    |                            |
 | can_discard_card  | bool, default `False`  |                            |
 
+## Endpoints
+
+### `POST /{game_id}/create`
+
+Creates a game: registers teams, seeds the full deck (all gemeentes +
+wild cards, `InDeck`, empty challenge text), deals 4 random cards to each
+team's private board, and reveals 7 random cards on the public board.
+
+Body:
+
+```json
+{
+  "teams": [
+    { "team_color": "orange", "team_name": "Team Oranje" },
+    { "team_color": "blue", "team_name": "Team Blauw" },
+    { "team_color": "purple", "team_name": "Team Paars" }
+  ]
+}
+```
+
+Rules: more than 1 team, team colors unique within the game, `game_id`
+must not already exist.
+
+Each team's 4 private cards get staggered reveal times (today): 2 cards
+at 10:00, 1 at 12:00, 1 at 14:00.
+
+### `GET /{game_id}/{team_color}/cards`
+
+Returns all cards currently visible to `team_color`: claimed cards (any
+team), public-board cards, and that team's private-board cards whose
+`visible_from` has passed. Shared visibility logic lives in
+`app/services.py::card_visible_to_team`.
+
+### `PUT /{game_id}/{team_color}/claim/{card_id}`
+
+Claims `card_id` for `team_color`, after checking it's visible to that
+team.
+
+- Non-wild card: card -> `Claimed`, `claimed_team` set, and the team's
+  `can_discard_card` is set to `True`.
+- Wild card: requires a `target_card_id` query parameter naming the
+  (not-yet-claimed, non-wild) card being claimed with it. Both the wild
+  card and the target card are set to `Claimed`. `can_discard_card` is
+  **not** granted for wild-card claims, per spec. A wild card can target
+  any not-yet-claimed regular card, even one not currently visible to the
+  team - that's the point of a wild card.
+
+Either way, 1 new random `InDeck` card is drawn onto the public board,
+and that new card is returned in the response.
+
+Example: `PUT /ABC123/orange/claim/42?target_card_id=7`
+
+### `PUT /{game_id}/{team_color}/discard/{card_id}`
+
+Requires `card_id` to be on the public board and the team's
+`can_discard_card` to be `True`. Resets the card to `InDeck`, resets
+`can_discard_card` to `False`, draws 1 new random `InDeck` card onto the
+public board, and returns that new card.
+
+## True randomness for card selection
+
+Every "pick N random cards" operation (dealing private boards, filling
+the public board, replenishing after a claim/discard) goes through
+`draw_random_cards()` in `app/services.py`, which issues:
+
+```python
+select(Card).where(...).order_by(func.random()).limit(n)
+```
+
+`func.random()` compiles to SQL `RANDOM()`, which both SQLite and
+PostgreSQL support natively - so the ordering (and therefore the
+selection) is genuinely randomized by the database on every call, rather
+than depending on row insertion order the way a plain `LIMIT n` would.
+"Without replacement" is enforced by state transitions: each draw only
+looks at cards still in `InDeck`, and a card's state is flushed to the
+DB before the next draw runs, so it can't be picked twice.
+
 ## Setup
 
 ```bash
@@ -90,9 +167,33 @@ postgresql://user:password@localhost:5432/jetlag
 
 No code changes needed - `app/database.py` picks it up automatically.
 
+## Project structure (updated)
+
+```
+jetlag-api/
+├── app/
+│   ├── __init__.py
+│   ├── models.py       # ORM data model: Card, Team, CardState, TeamColor
+│   ├── database.py     # engine/session setup, driven by DATABASE_URL
+│   ├── game_data.py    # static gemeente + wild card list used to seed a deck
+│   ├── schemas.py       # request/response schemas that aren't 1:1 with a table
+│   ├── services.py      # game logic: seeding, random draws, visibility, claim/discard
+│   ├── routers/
+│   │   ├── __init__.py
+│   │   └── games.py     # the 4 game endpoints
+│   └── main.py          # FastAPI app entrypoint
+├── requirements.txt
+├── .env.example
+└── README.md
+```
+
 ## Next steps
 
-- Add routers for `Cards` and `Teams` CRUD endpoints under `app/routers/`
-  and include them in `app/main.py`.
-- Add Pydantic "create"/"update" schemas if we don't want to expose every
-  ORM field directly on the API (e.g. hide `updated_timestamp` from input).
+- Populate real `challenge_title` / `challenge_description` text for each
+  gemeente (currently seeded empty).
+- Add auth so one team can't act as another.
+- Consider row-level locking (`SELECT ... FOR UPDATE`, PostgreSQL only)
+  around the random-draw queries if you expect concurrent requests for
+  the same game - the current code is safe for sequential/typical
+  gameplay traffic but two simultaneous claims for the same game could
+  theoretically race on SQLite.

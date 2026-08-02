@@ -1,0 +1,78 @@
+"""
+Static source data used to seed a new game's deck.
+
+GEMEENTES become regular challenge cards; WILD_CARDS become wild cards.
+Challenge title/description are intentionally left empty at seed time -
+fill those in separately (e.g. a follow-up admin endpoint or a seed
+script) once the actual challenge text is ready.
+"""
+
+GEMEENTES = [
+    "Aalten",
+    "Almelo",
+    "Apeldoorn",
+    "Arnhem",
+    "Barneveld",
+    "Berkelland",
+    "Borne",
+    "Bronckhorst",
+    "Brummen",
+    "Dalfsen",
+    "Deventer",
+    "Dinkelland",
+    "Doesburg",
+    "Doetinchem",
+    "Duiven",
+    "Ede",
+    "Elburg",
+    "Enschede",
+    "Epe",
+    "Ermelo",
+    "Haaksbergen",
+    "Hardenberg",
+    "Harderwijk",
+    "Hattem",
+    "Heerde",
+    "Hellendoorn",
+    "Hengelo",
+    "Hof van Twente",
+    "Kampen",
+    "Lochem",
+    "Losser",
+    "Montferland",
+    "Nijkerk",
+    "Nunspeet",
+    "Oldebroek",
+    "Oldenzaal",
+    "Olst-Wijhe",
+    "Ommen",
+    "Oost Gelre",
+    "Oude Ijsselstreek",
+    "Putten",
+    "Raalte",
+    "Renkum",
+    "Rheden",
+    "Rijssen-Holten",
+    "Rozendaal",
+    "Scherpenzeel",
+    "Staphorst",
+    "Steenwijkerland",
+    "Tubbergen",
+    "Twenterand",
+    "Voorst",
+    "Wageningen",
+    "Westervoort",
+    "Wierden",
+    "Winterswijk",
+    "Zevenaar",
+    "Zutphen",
+    "Zwartewaterland",
+    "Zwolle",
+]
+
+WILD_CARDS = [
+    "Pieterpad Wild Card",
+    "Nationale parken Wild Card",
+    "Burger King Wild Card",
+    "Station Wild Card",
+]
