@@ -21,6 +21,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Jetlag Game API", version="0.1.0", lifespan=lifespan)
 
+app.frontend("/", directory="frontend")
 app.include_router(games_router)
 
 

@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from sqlmodel import Session
 
 from app.database import get_session
-from app.models import Card, TeamColor
+from app.models import Card, Team, TeamColor
 from app.schemas import GameCreateRequest, GameCreateResponse
 from app.services import (
     CardNotFoundError,
@@ -29,6 +29,7 @@ from app.services import (
     discard_card,
     get_team_or_raise,
     get_visible_cards,
+    list_teams,
 )
 
 router = APIRouter()
@@ -74,6 +75,21 @@ def create_game_endpoint(
         cards_seeded=result.cards_seeded,
         cards_on_public_board=result.cards_on_public_board,
     )
+
+
+@router.get(
+    "/{game_id}/teams",
+    response_model=List[Team],
+    summary="List all teams in a game (name, color, can_discard_card)",
+)
+def list_teams_endpoint(
+    game_id: str = GameIdPath,
+    session: Session = Depends(get_session),
+):
+    try:
+        return list_teams(session, game_id)
+    except GameNotFoundError as exc:
+        _raise_as_http(exc)
 
 
 @router.get(

@@ -29,8 +29,10 @@ class TeamColor(str, Enum):
     """The three team colors used in the Jetlag game."""
 
     ORANGE = "orange"
-    BLUE = "blue"
     PURPLE = "purple"
+    PINK = "pink"
+    GREEN = "green"
+    YELLOW = "yellow"
 
 
 class Card(SQLModel, table=True):

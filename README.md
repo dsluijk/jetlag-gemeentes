@@ -84,6 +84,13 @@ must not already exist.
 Each team's 4 private cards get staggered reveal times (today): 2 cards
 at 10:00, 1 at 12:00, 1 at 14:00.
 
+### `GET /{game_id}/teams`
+
+Returns every team registered in the game (`team_color`, `team_name`,
+`can_discard_card`) - added for the frontend's score bar and to know
+when a team is currently allowed to discard. There's no per-team
+filtering: any client can see the full roster.
+
 ### `GET /{game_id}/{team_color}/cards`
 
 Returns all cards currently visible to `team_color`: claimed cards (any

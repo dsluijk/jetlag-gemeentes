@@ -120,6 +120,14 @@ def get_team_or_raise(session: Session, game_id: str, team_color: TeamColor) -> 
     return team
 
 
+def list_teams(session: Session, game_id: str) -> List[Team]:
+    """All teams registered for a game, e.g. for a score bar or lobby view."""
+    teams = session.exec(select(Team).where(Team.game_id == game_id)).all()
+    if not teams:
+        raise GameNotFoundError(f"Game '{game_id}' not found.")
+    return list(teams)
+
+
 def get_card_or_raise(session: Session, game_id: str, card_id: int) -> Card:
     card = session.get(Card, (game_id, card_id))
     if card is None:
@@ -151,7 +159,7 @@ def create_game(session: Session, game_id: str, teams: List[TeamCreate]) -> Game
                 card_name=name,
                 card_state=CardState.IN_DECK,
                 challenge_title="",
-                challenge_description="",
+                challenge_description="In the semifinals of the men's soccor world championship, Giovanni van Bronckhorst scored his furthest goal ever, from 37 meter, which helpen us beat Uruguay 3-2. Find a goal that is unmistakenly used to play soccer. Each team member must score their own Van Bronckhorst 'Magical Goal' from a distance of 37 meters. https://www.youtube.com/watch?v=JVQmWZoNHG4 ",
                 is_wild_card=False,
             ))
             card_id += 1
@@ -240,6 +248,17 @@ def claim_card(
     card_id: int,
     target_card_id: Optional[int] = None,
 ) -> List[Card]:
+    """
+    Claim `card_id` for `team_color`.
+
+    Returns the list of newly-drawn cards that replenished the public
+    board - 0, 1, or 2 of them:
+      - a non-wild claim frees at most 1 slot (the claimed card itself,
+        if it was on the public board)
+      - a wild-card claim can free up to 2 slots (the wild card and/or
+        the target card, independently, if either was on the public
+        board)
+    """
     team = get_team_or_raise(session, game_id, team_color)
     card = get_card_or_raise(session, game_id, card_id)
     

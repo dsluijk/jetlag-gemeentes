@@ -47,7 +47,7 @@ GEMEENTES = [
     "Olst-Wijhe",
     "Ommen",
     "Oost Gelre",
-    "Oude Ijsselstreek",
+    "Oude IJsselstreek",
     "Putten",
     "Raalte",
     "Renkum",
