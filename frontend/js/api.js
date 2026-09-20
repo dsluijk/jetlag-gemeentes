@@ -4,6 +4,11 @@
  * can just try/catch and show err.message.
  */
 const Api = {
+  /** Every game that exists, as [{game_id, team_count}] - drives the join page. */
+  getGames() {
+    return request("/games");
+  },
+
   getTeams(gameId) {
     return request(`/${gameId}/teams`);
   },

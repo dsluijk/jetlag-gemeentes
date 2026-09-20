@@ -1,7 +1,9 @@
 """
 Game endpoints:
 
+    GET  /games
     POST /{game_id}/create
+    GET  /{game_id}/teams
     GET  /{game_id}/{team_color}/cards
     PUT  /{game_id}/{team_color}/claim/{card_id}
     PUT  /{game_id}/{team_color}/discard/{card_id}
@@ -17,7 +19,7 @@ from sqlmodel import Session
 
 from app.database import get_session
 from app.models import Card, Team, TeamColor
-from app.schemas import GameCreateRequest, GameCreateResponse
+from app.schemas import GameCreateRequest, GameCreateResponse, GameSummary
 from app.services import (
     CardNotFoundError,
     CardNotVisibleError,
@@ -29,6 +31,7 @@ from app.services import (
     discard_card,
     get_team_or_raise,
     get_visible_cards,
+    list_games,
     list_teams,
 )
 
@@ -52,6 +55,15 @@ def _raise_as_http(exc: Exception) -> None:
     if isinstance(exc, InvalidActionError):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+
+
+@router.get(
+    "/games",
+    response_model=List[GameSummary],
+    summary="List every game, with how many teams each has",
+)
+def list_games_endpoint(session: Session = Depends(get_session)):
+    return list_games(session)
 
 
 @router.post(

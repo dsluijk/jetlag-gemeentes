@@ -42,3 +42,10 @@ class GameCreateResponse(BaseModel):
     teams_created: int
     cards_seeded: int
     cards_on_public_board: int
+
+
+class GameSummary(BaseModel):
+    """One row of GET /games - a game id plus how many teams are in it."""
+
+    game_id: str
+    team_count: int

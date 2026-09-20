@@ -6,8 +6,10 @@ flows.
 
 ## Stack
 
-Plain HTML/CSS/JS - no build step, no framework, no bundler. Open
-`index.html` (via a local static server - see below) and it runs.
+Plain HTML/CSS/JS - no build step, no framework, no bundler. Every file
+is a classic `<script src>` defining globals (`CONFIG`, `Api`, `State`,
+`UI`, ...); there are no ES modules. Start the backend and it runs - see
+Setup below.
 
 - **[MapLibre GL JS](https://maplibre.org/)** for the map - open source,
   no API key required. Gemeente polygons are parsed from your KML file
@@ -18,50 +20,67 @@ Plain HTML/CSS/JS - no build step, no framework, no bundler. Open
 
 ## Setup
 
-1. Have the [jetlag-api](../jetlag-api) backend running somewhere reachable
-   (defaults to `http://localhost:8000`).
-2. Replace `data/gemeentes.sample.kml` with your real My Maps KML export
+The backend serves this folder itself (`app.frontend("/", directory="frontend")`
+in `app/main.py`), so there's no separate static server and no CORS to
+configure - `CONFIG.API_BASE_URL` is deliberately empty, making every
+request same-origin.
+
+1. Replace `data/gemeentes.sample.kml` with your real My Maps KML export
    (same filename, or update `CONFIG.KML_PATH` in `js/config.js`). It
    must use `<ExtendedData><SchemaData><SimpleData name="gemeentenaam">`
    for each placemark's name - that's what the parser looks for.
-3. Edit `js/config.js`: at minimum, check `API_BASE_URL`.
-4. Serve the folder over HTTP (KML/JS fetches need a real origin, not
-   `file://`):
+2. Run the backend from the repo root (the `frontend` path is relative to
+   the working directory):
    ```bash
-   python3 -m http.server 8000
+   uvicorn app.main:app --reload
    ```
-5. Open `http://localhost:8000/?game=<GAME_ID>&team=<TEAM_COLOR>` - e.g.
-   `?game=ABC123&team=orange`. There's no login flow yet, so the game id
-   and your team color are just URL parameters for now.
+3. Open `http://localhost:8000/` and pick a game and a team. You need at
+   least one game to exist - create one with
+   `POST /{game_id}/create` if the list is empty.
+
+## Pages
+
+- **`index.html`** - the join page at `/`. Lists games from `GET /games`
+  and the chosen game's teams from `GET /{game_id}/teams`, then sends you
+  to the board. It pre-fills your last pick from `localStorage` but never
+  skips itself, so switching teams stays possible. Links that still point
+  at `/?game=…&team=…` are redirected to the board.
+- **`board.html`** - the map board, opened as
+  `board.html?game=<GAME_ID>&team=<TEAM_COLOR>`. Without both parameters
+  it redirects back to the join page. There's no login flow, so the game
+  id and team color are still just URL parameters.
 
 ## Architecture
 
 ```
 jetlag-frontend/
-├── index.html
+├── index.html                  # join page: pick a game + team
+├── board.html                  # the map board
 ├── css/styles.css
 ├── data/gemeentes.sample.kml   # replace with your real export
 └── js/
     ├── config.js       # all tunables: API URL, colors, basemap toggle, gemeente list
-    ├── api.js          # fetch wrappers for the 4 backend endpoints
+    ├── api.js          # fetch wrappers for the backend endpoints
+    ├── join.js         # join page: game/team pickers (loads only config.js + api.js)
     ├── kml-parser.js   # KML -> GeoJSON, using the browser's DOMParser
     ├── state.js        # single source of truth + derived views (panel cards, scores, ...)
     ├── map-view.js      # MapLibre map, GeoJSON source, per-feature styling
     ├── ui.js            # cards panel, score bar, claim/discard modal, toasts
-    └── main.js          # bootstraps everything, owns the refresh cycle
+    └── main.js          # bootstraps the board, owns the refresh cycle
 ```
 
 **State flow**: every API response is written into `State`. After any
 change - initial load, manual refresh, or the result of a claim/discard
+
 - `MapView.applyStyles()` and `UI.render()` redraw the map, cards panel,
-and score bar entirely from `State`. Nothing is patched incrementally, so
-the UI can't drift out of sync with itself. At this game's scale
-(~60 cards, a handful of teams) a full redraw is cheap.
+  and score bar entirely from `State`. Nothing is patched incrementally, so
+  the UI can't drift out of sync with itself. At this game's scale
+  (~60 cards, a handful of teams) a full redraw is cheap.
 
 **Refreshing**: per your instructions, there's no polling and no
 websockets - only the refresh button (spinner icon, top right), plus an
 automatic refresh right after your own claim/discard so you immediately
-see its effect. To see *other* teams' moves, someone has to tap refresh.
+see its effect. To see _other_ teams' moves, someone has to tap refresh.
 
 ## The basemap toggle
 
@@ -81,7 +100,7 @@ see its effect. To see *other* teams' moves, someone has to tap refresh.
 
 - **The `GEMEENTES` list in `js/config.js` duplicates
   `app/game_data.py`** in the backend. The wild-card claim flow needs to
-  offer *every* unclaimed gemeente as a target, including ones this team
+  offer _every_ unclaimed gemeente as a target, including ones this team
   has never seen a `Card` object for (still `InDeck`, or on another
   team's unrevealed private board) - so it can't rely on data the API
   has actually sent. Instead it recomputes the same `card_id` the
