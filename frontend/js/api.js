@@ -9,6 +9,10 @@ const Api = {
     return request("/games");
   },
 
+  getPairs() {
+    return request("/pairs");
+  },
+
   getTeams(gameId) {
     return request(`/${gameId}/teams`);
   },
