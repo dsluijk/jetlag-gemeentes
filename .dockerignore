@@ -9,4 +9,6 @@ __pycache__
 Dockerfile
 .dockerignore
 docker-compose.yaml
+compose.yaml
+Caddyfile
 *.md
