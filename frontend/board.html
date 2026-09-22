@@ -54,14 +54,6 @@
 
       <div class="score-bar">
         <div id="score-chips" class="score-chips"></div>
-        <button
-          id="discard-btn"
-          type="button"
-          class="btn btn--danger btn--small"
-          hidden
-        >
-          Discard a card
-        </button>
       </div>
 
       <main class="map-wrap">
@@ -79,6 +71,21 @@
         </button>
         <div id="cards-list" class="cards-list"></div>
       </section>
+
+      <!-- Takes the cards panel's place while a discard is owed: the deck
+           stays out of sight, the map doesn't. -->
+      <div id="discard-nag" class="discard-nag" hidden>
+        <p class="discard-nag__text">
+          You still owe a discard. The board is read-only until you pick a card.
+        </p>
+        <button
+          id="discard-nag-btn"
+          type="button"
+          class="btn btn--danger discard-nag__btn"
+        >
+          Discard a card
+        </button>
+      </div>
     </div>
 
     <div id="modal-overlay" class="modal-overlay" hidden>
