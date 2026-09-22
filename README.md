@@ -33,32 +33,40 @@ jetlag-api/
 
 Composite primary key: `(game_id, card_id)`.
 
-| Field                 | Type                  | Notes                          |
-|-----------------------|------------------------|---------------------------------|
-| game_id               | str (PK)               |                                  |
-| card_id               | int (PK)               |                                  |
-| card_name             | str                    |                                  |
-| card_state            | enum `CardState`       | InDeck / OnPublicBoard / OnPrivateBoard / Claimed |
-| challenge_title       | str                    |                                  |
-| challenge_description | str                    |                                  |
-| visible_from          | datetime, optional     |                                  |
-| private_board_team    | str, optional          |                                  |
-| claimed_team          | str, optional          |                                  |
-| is_wild_card          | bool, default `False`  |                                  |
-| updated_timestamp     | datetime, default now  |                                  |
+| Field                 | Type                  | Notes                                             |
+| --------------------- | --------------------- | ------------------------------------------------- |
+| game_id               | str (PK)              |                                                   |
+| card_id               | int (PK)              |                                                   |
+| card_name             | str                   |                                                   |
+| card_state            | enum `CardState`      | InDeck / OnPublicBoard / OnPrivateBoard / Claimed |
+| challenge_title       | str                   |                                                   |
+| challenge_description | str                   |                                                   |
+| visible_from          | datetime, optional    |                                                   |
+| private_board_team    | str, optional         |                                                   |
+| claimed_team          | str, optional         |                                                   |
+| is_wild_card          | bool, default `False` |                                                   |
+| updated_timestamp     | datetime, default now |                                                   |
 
 ### Teams (table `teams`)
 
 Composite primary key: `(game_id, team_color)`.
 
-| Field             | Type                  | Notes                    |
-|-------------------|------------------------|---------------------------|
-| game_id           | str (PK)               |                            |
-| team_color        | enum `TeamColor` (PK)  | orange / blue / purple    |
-| team_name         | str                    |                            |
-| can_discard_card  | bool, default `False`  |                            |
+| Field            | Type                  | Notes                  |
+| ---------------- | --------------------- | ---------------------- |
+| game_id          | str (PK)              |                        |
+| team_color       | enum `TeamColor` (PK) | orange / blue / purple |
+| team_name        | str                   |                        |
+| can_discard_card | bool, default `False` |                        |
 
 ## Endpoints
+
+### `GET /games`
+
+Returns every game that exists, as `[{"game_id": ..., "team_count": ...}]`,
+sorted by id. There is no games table, a game exists implicitly as a
+`game_id` shared by its teams. The list is derived by grouping the
+teams table. Added for the frontend's join page; an empty list is a
+normal response, not a 404.
 
 ### `POST /{game_id}/create`
 
@@ -187,7 +195,7 @@ jetlag-api/
 │   ├── services.py      # game logic: seeding, random draws, visibility, claim/discard
 │   ├── routers/
 │   │   ├── __init__.py
-│   │   └── games.py     # the 4 game endpoints
+│   │   └── games.py     # the game endpoints
 │   └── main.py          # FastAPI app entrypoint
 ├── requirements.txt
 ├── .env.example

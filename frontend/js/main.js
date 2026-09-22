@@ -1,6 +1,6 @@
 /**
  * Bootstraps the app once the DOM (and the maplibre-gl script tag,
- * loaded before this file in index.html) is ready. Unlike the Google
+ * loaded before this file in board.html) is ready. Unlike the Google
  * Maps JS API, MapLibre needs no API key and no async callback dance -
  * we can just call this directly.
  */
@@ -9,10 +9,9 @@ async function initApp() {
   const myTeamColor = getMyTeamColor();
 
   if (!gameId || !myTeamColor) {
-    showFatalError(
-      "Add a game and team to the URL to load a board, e.g. " +
-        `<code>?game=ABC123&team=orange</code>.`
-    );
+    // Nothing to load without both - send them to the join page to pick.
+    // replace() rather than assign() so Back doesn't bounce them here again.
+    window.location.replace("/");
     return;
   }
 

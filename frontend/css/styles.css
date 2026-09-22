@@ -87,6 +87,23 @@ button {
   flex: 0 0 auto;
 }
 
+/* Groups the logo with the title so the topbar's space-between still has
+   two children and the refresh button stays pinned right. */
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+/* Sized off the title's cap height rather than a fixed width, so the two
+   stay visually matched. Ratio comes from the intrinsic 463x149. */
+.topbar__logo {
+  height: 1.8rem;
+  width: auto;
+  flex: 0 0 auto;
+}
+
 .topbar__title {
   font-family: var(--font-display);
   font-weight: 600;
@@ -510,6 +527,73 @@ button {
   background: var(--hairline);
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Join page (index.html)                                               */
+/* ------------------------------------------------------------------ */
+/* The form itself reuses .modal-field, .modal-error, .modal-actions,
+   .discard-list and .discard-option - only the page shell and the team
+   swatch are new. The fixed max-width centres it on desktop too, so
+   there's nothing to add under the wide-screen breakpoint below. */
+.join {
+  max-width: 420px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 2rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Intrinsic size is 463x149; height:auto keeps that ratio once the
+   max-width kicks in on narrow screens. */
+.join__logo {
+  display: block;
+  width: 220px;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto 1.5rem;
+}
+
+.join__title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  margin: 0 0 0.35rem;
+}
+
+.join__subtitle {
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+  margin: 0 0 1.5rem;
+}
+
+/* The team group is labelled by a <span>, not a <label>, so it can't
+   lean on the .modal-field label rule. */
+.join__label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--ink-muted);
+  margin-bottom: 0.3rem;
+}
+
+.join__hint {
+  color: var(--ink-muted);
+  font-size: 0.85rem;
+  margin: 0.2rem 0;
+}
+
+.join-team {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.join-team__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
 }
 
 /* ------------------------------------------------------------------ */

@@ -13,7 +13,7 @@ from sqlmodel import Session, select
 
 from app.game_data import GEMEENTES, WILD_CARDS
 from app.models import Card, CardState, Team, TeamColor
-from app.schemas import TeamCreate
+from app.schemas import GameSummary, TeamCreate
 
 PRIVATE_BOARD_CARDS_PER_TEAM = 4
 PUBLIC_BOARD_INITIAL_CARDS = 7
@@ -126,6 +126,26 @@ def list_teams(session: Session, game_id: str) -> List[Team]:
     if not teams:
         raise GameNotFoundError(f"Game '{game_id}' not found.")
     return list(teams)
+
+
+def list_games(session: Session) -> List[GameSummary]:
+    """
+    Every game that has at least one team, with how many teams it has.
+
+    There is no games table - a game exists implicitly as a game_id shared
+    by its teams - so the list is derived by grouping the teams table.
+    Unlike list_teams, an empty result is not an error: "no games yet" is a
+    normal state for the join page to render.
+    """
+    statement = (
+        select(Team.game_id, func.count().label("team_count"))
+        .group_by(Team.game_id)
+        .order_by(Team.game_id)
+    )
+    return [
+        GameSummary(game_id=game_id, team_count=team_count)
+        for game_id, team_count in session.exec(statement)
+    ]
 
 
 def get_card_or_raise(session: Session, game_id: str, card_id: int) -> Card:

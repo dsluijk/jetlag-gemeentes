@@ -1,68 +1,65 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-  <title>Gemeentejacht</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;500;600&display=swap"
-    rel="stylesheet"
-  />
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
-  <link rel="stylesheet" href="css/styles.css" />
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1"
+    />
+    <title>Gemeentejacht</title>
+    <link rel="icon" type="image/png" href="/img/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+    <script>
+      // Links from before the board moved to board.html still point here with
+      // ?game=&team= on them - send those straight through. Inline in <head>
+      // so it happens before the join form is ever painted.
+      (function () {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("game") && params.get("team")) {
+          window.location.replace("board.html" + window.location.search);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <main class="join">
+      <img
+        class="join__logo"
+        src="img/jetlag.png"
+        alt="Jetlag"
+        width="463"
+        height="149"
+      />
+      <h1 class="join__title">Gemeentejacht</h1>
+      <p class="join__subtitle">Pick your game and team to open the board.</p>
 
-  <!-- Shown instead of the app if setup/loading fails. -->
-  <div id="fatal-error" class="fatal-error" hidden></div>
+      <div id="join-error" class="modal-error" hidden></div>
 
-  <div id="app" class="app">
+      <div class="modal-field">
+        <label for="join-game">Game</label>
+        <select id="join-game" disabled></select>
+      </div>
 
-    <header class="topbar">
-      <h1 class="topbar__title">Gemeentejacht</h1>
-      <button id="refresh-btn" type="button" class="icon-btn" aria-label="Refresh board" title="Refresh board">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-          <path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.75 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z"/>
-        </svg>
-      </button>
-    </header>
+      <div class="modal-field" role="group" aria-labelledby="join-team-label">
+        <span id="join-team-label" class="join__label">Team</span>
+        <div id="join-teams" class="discard-list"></div>
+      </div>
 
-    <div class="score-bar">
-      <div id="score-chips" class="score-chips"></div>
-      <button id="discard-btn" type="button" class="btn btn--danger btn--small" hidden>Discard a card</button>
-    </div>
-
-    <main class="map-wrap">
-      <div id="map" class="map"></div>
+      <div class="modal-actions">
+        <button id="join-btn" type="button" class="btn btn--primary" disabled>
+          Open board
+        </button>
+      </div>
     </main>
 
-    <section id="cards-panel" class="cards-panel">
-      <button id="cards-panel-handle" type="button" class="cards-panel__handle">
-        <span class="cards-panel__grip" aria-hidden="true"></span>
-        <span id="cards-count" class="cards-panel__count">0 cards</span>
-      </button>
-      <div id="cards-list" class="cards-list"></div>
-    </section>
-
-  </div>
-
-  <div id="modal-overlay" class="modal-overlay" hidden>
-    <div id="modal-sheet" class="modal-sheet" role="dialog" aria-modal="true">
-      <div id="modal-content"></div>
-    </div>
-  </div>
-
-  <div id="toast-container" class="toast-container" aria-live="polite"></div>
-
-  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/kml-parser.js"></script>
-  <script src="js/state.js"></script>
-  <script src="js/map-view.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/main.js"></script>
-</body>
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/join.js"></script>
+  </body>
 </html>
