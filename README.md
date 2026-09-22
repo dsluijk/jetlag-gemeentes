@@ -182,6 +182,44 @@ postgresql://user:password@localhost:5432/jetlag
 
 No code changes needed - `app/database.py` picks it up automatically.
 
+## Running with Docker Compose
+
+```bash
+cp .env.example .env
+docker compose up -d
+```
+
+Three services: `postgres`, `webserver`, and `caddy`, which
+is the only one publishing ports (80 and 443) and terminates TLS in
+front of the webserver.
+
+Caddy's config is the `Caddyfile` at the repo root, mounted read-only
+into the container. It's one site block, parameterised by two
+environment variables:
+
+| Variable            | Notes                                                                        |
+| ------------------- | ---------------------------------------------------------------------------- |
+| `DOMAIN`            | Hostname Caddy answers on. Falls back to `localhost`.                        |
+| `TLS_MODE`          | `internal`, or an email address for Let's Encrypt. Falls back to `internal`. |
+| `POSTGRES_PASSWORD` | Postgres database password, change to a random value.                        |
+
+Those fallbacks are set in `compose.yaml`, missing or empty `.env` entry
+still brings up a working local stack. The `Caddyfile` reads both variables.
+
+`TLS_MODE=internal` makes Caddy issue the certificate from its own
+local CA instead of going through ACME, useful for local testing.
+`localhost` (and any domain that doesn't resolve publicly) can't pass
+an ACME challenge. Browsers will warn about the certificate unless you
+install Caddy's root CA from the `caddy_data` volume
+(`/data/caddy/pki/authorities/local/root.crt`), or just use
+`curl -k` / `--insecure`.
+
+For a real deployment set `DOMAIN` to a hostname pointing at the box
+with ports 80 and 443 reachable, and `TLS_MODE` to your email address -
+Caddy then obtains and renews Let's Encrypt certificates on its own.
+Certificates live in the `caddy_data` volume, so don't delete it between
+restarts or you'll re-issue (and can hit rate limits).
+
 ## Project structure (updated)
 
 ```
