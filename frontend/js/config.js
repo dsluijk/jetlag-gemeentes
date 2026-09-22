@@ -66,10 +66,10 @@ const CONFIG = {
     strokeWidth: 2.5,
     claimedStrokeWidth: 4,
 
-    // Hovering a gemeente outlines it and highlights everything it
-    // borders (see MapView._setHovered). Drawn on top of the regular
-    // fills, so these have to read against both the pale unclaimed
-    // colors and the saturated team ones.
+    // Hovering a gemeente (tapping it, on touch) outlines it and
+    // highlights everything it borders (see MapView._setHighlighted).
+    // Drawn on top of the regular fills, so these have to read against
+    // both the pale unclaimed colors and the saturated team ones.
     hoverColor: "#22211C", // same ink as its outline, so the two read as one shape
     hoverOpacity: 0.8,
     hoverStrokeColor: "#22211C",
