@@ -6,30 +6,30 @@
 const Api = {
   /** Every game that exists, as [{game_id, team_count}] - drives the join page. */
   getGames() {
-    return request("/games");
+    return request("games");
   },
 
   getPairs() {
-    return request("/pairs");
+    return request("pairs");
   },
 
   getTeams(gameId) {
-    return request(`/${gameId}/teams`);
+    return request(`${gameId}/teams`);
   },
 
   getCards(gameId, teamColor) {
-    return request(`/${gameId}/${teamColor}/cards`);
+    return request(`${gameId}/${teamColor}/cards`);
   },
 
   /** Returns the list of newly-drawn replacement cards (may be empty). */
   claimCard(gameId, teamColor, cardId, targetCardId) {
     const qs = targetCardId != null ? `?target_card_id=${encodeURIComponent(targetCardId)}` : "";
-    return request(`/${gameId}/${teamColor}/claim/${cardId}${qs}`, { method: "PUT" });
+    return request(`${gameId}/${teamColor}/claim/${cardId}${qs}`, { method: "PUT" });
   },
 
   /** Returns the single newly-drawn replacement card. */
   discardCard(gameId, teamColor, cardId) {
-    return request(`/${gameId}/${teamColor}/discard/${cardId}`, { method: "PUT" });
+    return request(`${gameId}/${teamColor}/discard/${cardId}`, { method: "PUT" });
   },
 };
 

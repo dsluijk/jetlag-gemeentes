@@ -6,7 +6,7 @@
  * since there's no login flow yet - see README.md.
  */
 const CONFIG = {
-  // Point this at your running backend (see the jetlag-api project).
+  // Point this at your running backend, including a trailing slash (see the jetlag-api project).
   API_BASE_URL: "",
 
   // Path to the KML file with gemeente boundary polygons. Replace
