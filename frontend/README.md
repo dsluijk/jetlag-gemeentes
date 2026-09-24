@@ -98,17 +98,47 @@ offline and don't break if someone else's hosting goes away - see
 `data/fonts/README.md`. Setting `GLYPHS_URL` to `""` turns labels off
 entirely and stops the map requesting any glyphs at all.
 
-**Hover highlighting**: hovering a gemeente fills and outlines it, and
+**Neighbour highlighting**: picking a gemeente fills and outlines it, and
 tints every gemeente it borders, so you can see at a glance what a claim
 would connect to. This is the one thing that deliberately sits outside
 the redraw-everything flow above: it only swaps the `filter` on four
-dedicated highlight layers (`MapView._setHovered()`) rather than
+dedicated highlight layers (`MapView._setHighlighted()`) rather than
 re-uploading the whole polygon source on every mouse move. Borders come
 from the same `GET /pairs` graph scoring uses, so before that request
-lands only the hovered gemeente's own outline shows. It's wired up only
-on devices with a real pointer - touch browsers fire a mousemove on tap
-but never a matching mouseleave, which would leave the highlight stuck on
-the last gemeente tapped, and a tap already opens its card.
+lands only the picked gemeente's own outline shows.
+
+What counts as picking it depends on what you're pointing with, and a
+device can offer more than one - a Galaxy with an S Pen hovers with the
+pen and taps with a finger, so all of these are wired up at once rather
+than either/or:
+
+- **A mouse** drives it from `mousemove`, cleared on `mouseleave`.
+- **A stylus** drives it from `pointermove` with `pointerType === "pen"`,
+  cleared on `pointerout` when the pen leaves hover range. Handled
+  separately from the mouse because a browser won't necessarily
+  synthesise mouse events for a pen that's hovering rather than touching.
+- **A finger** can't hover, so the two things get a gesture each: a tap
+  opens a gemeente's card, and holding still on one for `LONG_PRESS_MS`
+  highlights it instead (without opening the card - the press swallows
+  the click its release turns into). A tap that lands on no gemeente
+  clears the highlight. Drifting more than `LONG_PRESS_MOVE_TOLERANCE`
+  means you're panning, and a second finger means you're pinching; either
+  one calls the press off.
+
+Note what is _not_ here: a media query deciding whether to listen for
+hover at all. `(hover: hover)` only describes the _primary_ input, so it
+reads "none" on a stylus phone; `(any-hover: hover)` is no better, since
+Chrome on Android reports "none" for a stowed S Pen - it can't know the
+pen hovers until it does. Nothing here asks CSS what the hardware is any
+more. The handlers are keyed off `pointerType` on the events themselves,
+which is the device telling us what it actually is rather than us
+guessing in advance.
+
+The one piece of bookkeeping that needs is `_lastPointerType`: a finger
+tap fires a *synthetic* mousemove, which the ungated mouse handlers would
+otherwise treat as a hover and highlight on every tap. Recording the last
+real pointer event lets them bail on touch. It's recorded on `pointerdown`
+as well as `pointermove`, because a tap never sends a pointermove at all.
 
 **Refreshing**: per your instructions, there's no polling and no
 websockets - only the refresh button (spinner icon, top right), plus an

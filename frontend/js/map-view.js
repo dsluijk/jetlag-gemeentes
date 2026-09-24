@@ -6,17 +6,22 @@
  * after every state refresh, never incrementally, so the map can never
  * end up showing a stale color for one gemeente.
  *
- * Hover highlighting is deliberately *not* part of that pass: it swaps
- * the filters on four dedicated layers instead, so moving the mouse
- * never re-uploads the (fairly large) polygon source.
+ * Highlighting one gemeente and its neighbours is deliberately *not*
+ * part of that pass: it swaps the filters on four dedicated layers
+ * instead, so moving the mouse never re-uploads the (fairly large)
+ * polygon source.
  */
 const MapView = {
   map: null,
   geojson: null,
   loaded: false,
   onGemeenteClick: null,
-  hoveredName: null,
+  highlightedName: null,
   _pendingStyleUpdate: false,
+  _lastPointerType: null,
+  _touchStart: null,
+  _longPressTimer: null,
+  _longPressFired: false,
 
   /**
    * @param {HTMLElement} mapDiv
@@ -160,22 +165,117 @@ const MapView = {
       }
 
       this.map.on("click", "gemeentes-fill", (e) => {
+        // A long press has already highlighted this gemeente, and the
+        // release turns into a click too - which shouldn't then open the
+        // card over the highlight the press just asked for.
+        if (this._longPressFired) return;
         if (e.features && e.features[0]) {
           this.onGemeenteClick(e.features[0].properties.name);
         }
       });
-      if (supportsHover()) {
-        // mousemove rather than mouseenter: the pointer can cross from one
-        // gemeente straight into the next without ever leaving the layer.
-        this.map.on("mousemove", "gemeentes-fill", (e) => {
-          this.map.getCanvas().style.cursor = "pointer";
-          this._setHovered(e.features && e.features[0] ? e.features[0].properties.name : null);
-        });
-        this.map.on("mouseleave", "gemeentes-fill", () => {
-          this.map.getCanvas().style.cursor = "";
-          this._setHovered(null);
+
+      // Ungated: asking CSS whether this device can hover doesn't work.
+      // `(hover: hover)` only describes the *primary* input, so it says
+      // "none" on a stylus phone, and `(any-hover: hover)` isn't reliable
+      // either - Chrome on Android reports "none" for a stowed S Pen,
+      // since it can't know the pen hovers until it does. So we just
+      // listen, and let whatever the device actually sends decide.
+      //
+      // mousemove rather than mouseenter: the pointer can cross from one
+      // gemeente straight into the next without ever leaving the layer.
+      //
+      // A finger tap also fires a synthetic mousemove, which would
+      // highlight on every tap - so these bail on touch, whose highlight
+      // is the long press's job below.
+      this.map.on("mousemove", "gemeentes-fill", (e) => {
+        if (this._lastPointerType === "touch") return;
+        this.map.getCanvas().style.cursor = "pointer";
+        this._setHighlighted(
+          e.features && e.features[0] ? e.features[0].properties.name : null,
+        );
+      });
+      this.map.on("mouseleave", "gemeentes-fill", () => {
+        if (this._lastPointerType === "touch") return;
+        this.map.getCanvas().style.cursor = "";
+        this._setHighlighted(null);
+      });
+
+      // The stylus, straight off the pointer events rather than hoping
+      // the browser also synthesises the mouse ones above for a pen that
+      // is hovering rather than touching. Restricted to pens so a finger
+      // drag doesn't drag the highlight around with it while panning -
+      // touch goes through the long-press handlers instead.
+      const canvas = this.map.getCanvasContainer();
+      canvas.addEventListener("pointermove", (e) => {
+        if (e.pointerType !== "pen") return;
+        const rect = canvas.getBoundingClientRect();
+        const hits = this.map.queryRenderedFeatures(
+          [e.clientX - rect.left, e.clientY - rect.top],
+          { layers: ["gemeentes-fill"] },
+        );
+        this._setHighlighted(hits.length ? hits[0].properties.name : null);
+      });
+      // Pen lifted out of hover range, or moved off the map entirely.
+      canvas.addEventListener("pointerout", (e) => {
+        if (e.pointerType === "pen") this._setHighlighted(null);
+      });
+
+      // Which input last did something. The mouse handlers above need it
+      // to tell a real mouse from the synthetic events a finger tap
+      // fires, and those arrive after the pointer ones - so recording it
+      // on down as well as move matters: a tap never sends a pointermove,
+      // and without the down it would still read as whatever came before.
+      const notePointerType = (e) => {
+        this._lastPointerType = e.pointerType;
+      };
+      canvas.addEventListener("pointerdown", notePointerType, true);
+      canvas.addEventListener("pointermove", notePointerType, true);
+
+      // The finger: a tap opens the card, holding still highlights
+      // instead. Keyed off pointerType rather than a media query, so a
+      // mouse or pen on the same device keeps its own behaviour.
+      canvas.addEventListener("pointerdown", (e) => {
+        if (e.pointerType !== "touch") return;
+        this._cancelLongPress();
+        // A second finger landing means a pinch, so the press that was in
+        // progress is off - and a pinch held still shouldn't start a new
+        // one either, hence cancelling before this rather than after.
+        if (!e.isPrimary) return;
+        this._longPressFired = false;
+        this._touchStart = { x: e.clientX, y: e.clientY };
+        this._longPressTimer = setTimeout(() => this._onLongPress(), LONG_PRESS_MS);
+      });
+
+      // Drifting past the tolerance means this is a pan, not a press.
+      canvas.addEventListener("pointermove", (e) => {
+        if (e.pointerType !== "touch" || !this._touchStart) return;
+        const drift = Math.hypot(
+          e.clientX - this._touchStart.x,
+          e.clientY - this._touchStart.y,
+        );
+        if (drift > LONG_PRESS_MOVE_TOLERANCE) this._cancelLongPress();
+      });
+
+      // Lifting early makes it a tap. _longPressFired deliberately isn't
+      // reset here - the click it turns into still has to see it, and the
+      // next pointerdown clears it.
+      for (const type of ["pointerup", "pointercancel"]) {
+        canvas.addEventListener(type, (e) => {
+          if (e.pointerType === "touch") this._cancelLongPress();
         });
       }
+
+      // What takes the place of mouseleave for a finger: a tap that lands
+      // on no gemeente at all clears the highlight. Queried rather than
+      // relying on this firing before or after the layer handler above,
+      // since both run for a tap that did hit one.
+      this.map.on("click", (e) => {
+        if (this._lastPointerType !== "touch" || this._longPressFired) return;
+        const hits = this.map.queryRenderedFeatures(e.point, {
+          layers: ["gemeentes-fill"],
+        });
+        if (hits.length === 0) this._setHighlighted(null);
+      });
 
       const bounds = computeBounds(this.geojson);
       if (bounds) this.map.fitBounds(bounds, { padding: 24, duration: 0 });
@@ -189,17 +289,46 @@ const MapView = {
   },
 
   /**
+   * The finger has been held still long enough: highlight whatever is
+   * under where it went down, and flag the press so the click its release
+   * turns into doesn't also open the card.
+   *
+   * Uses the *start* position rather than wherever the finger is now, so
+   * the highlight matches the gemeente the press began on even if it
+   * drifted a little within the tolerance.
+   */
+  _onLongPress() {
+    this._longPressTimer = null;
+    if (!this._touchStart) return;
+
+    this._longPressFired = true;
+    const rect = this.map.getCanvasContainer().getBoundingClientRect();
+    const hits = this.map.queryRenderedFeatures(
+      [this._touchStart.x - rect.left, this._touchStart.y - rect.top],
+      { layers: ["gemeentes-fill"] },
+    );
+    this._setHighlighted(hits.length ? hits[0].properties.name : null);
+  },
+
+  /** Stop a press in progress from becoming a long press. */
+  _cancelLongPress() {
+    clearTimeout(this._longPressTimer);
+    this._longPressTimer = null;
+    this._touchStart = null;
+  },
+
+  /**
    * Fill and outline `name`, and highlight every gemeente it borders;
    * pass null to clear. Only the four highlight layers' filters change,
    * so this is cheap enough to run straight off mousemove.
    *
    * Borders come from State, which only has them once GET /pairs has
-   * landed - before that (or if it failed) the hovered gemeente still
+   * landed - before that (or if it failed) the picked gemeente still
    * gets its own highlight, just with nothing highlighted around it.
    */
-  _setHovered(name) {
-    if (!this.loaded || name === this.hoveredName) return;
-    this.hoveredName = name;
+  _setHighlighted(name) {
+    if (!this.loaded || name === this.highlightedName) return;
+    this.highlightedName = name;
 
     const hovered = matchNames(name ? [name] : []);
     const neighbours = name ? [...State.neighboursOf(name)] : [];
@@ -302,15 +431,11 @@ function matchNames(names) {
   return ["in", ["get", "name"], ["literal", names]];
 }
 
-/**
- * Whether this device has a real pointer. Touch browsers fire a synthetic
- * mousemove on tap but no matching mouseleave, so wiring hover up there
- * would leave the highlight stuck on whatever was tapped last - and a tap
- * already opens that gemeente's card anyway.
- */
-function supportsHover() {
-  return window.matchMedia("(hover: hover)").matches;
-}
+/** How long (ms) a finger must stay down before it highlights rather than opening a card. */
+const LONG_PRESS_MS = 350;
+
+/** How far (px) a finger may drift during that and still count as held rather than panning. */
+const LONG_PRESS_MOVE_TOLERANCE = 10;
 
 /**
  * Builds the MapLibre style JSON for the base map, honoring
