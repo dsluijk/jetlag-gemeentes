@@ -383,6 +383,12 @@ button {
   z-index: 100;
 }
 
+/* Only ever focused in code, to move the keyboard into the dialog - it is
+   not a tab stop, so it has no ring to earn. */
+.modal-sheet:focus {
+  outline: none;
+}
+
 .modal-sheet {
   background: var(--surface);
   width: 100%;
@@ -501,11 +507,16 @@ button {
   justify-content: flex-end;
 }
 
+/* The focus ring is drawn 4px outside an option's border box, and a
+   scrolling container clips anything outside its padding box - so the list
+   carries that much padding and takes it straight back off the margins,
+   leaving the options lined up with everything else on the screen. */
 .discard-list {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  margin-bottom: 1rem;
+  padding: 0.3rem;
+  margin: -0.3rem -0.3rem 0.7rem;
   max-height: 40vh;
   overflow-y: auto;
 }
@@ -528,7 +539,7 @@ button {
 /* ------------------------------------------------------------------ */
 /* Blocking screen (the mandatory discard)                              */
 /* ------------------------------------------------------------------ */
-/* A discard the rules already owe isn't a dialog you dismiss, so the
+/* A discard the rules already require isn't a dialog you dismiss, so the
    overlay stops behaving like a sheet: it fills the viewport, hides
    nothing behind a tap target, and carries no close button. The two-class
    selectors are deliberate - they have to outrank the wide-screen
@@ -600,11 +611,26 @@ button {
   margin: 0 0 0.5rem;
 }
 
+/* Worded as a reminder but styled like the nag bar and .modal-error, red
+   and outlined: it's competing for attention with a list of cards the team
+   is already reaching for, so a footnote would lose. */
+.discard-screen__reminder {
+  background: var(--danger-ink);
+  color: var(--danger);
+  border: 1.5px solid var(--danger);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.4;
+  margin: 0 0 0.8rem;
+}
+
 .discard-screen .discard-list {
   flex: 1 1 auto;
   max-height: none;
   gap: 0.5rem;
-  padding-right: 0.15rem; /* breathing room for the scrollbar */
+  padding-right: 0.45rem; /* the ring's 0.3rem, plus room for the scrollbar */
 }
 
 .discard-screen .discard-option {
@@ -623,8 +649,16 @@ button {
   padding-bottom: 0.8rem;
 }
 
+/* The deck stays readable while the game is frozen - it's what a team
+   reads to decide what to throw away - so it picks up the red edge of the
+   bar below it rather than going away. Nothing here disables the cards:
+   they still open, they just don't offer a claim. */
+.cards-panel--readonly {
+  border-top-color: var(--danger);
+}
+
 /* ------------------------------------------------------------------ */
-/* Read-only bar (the board while a discard is still owed)              */
+/* Read-only bar (the board while a team is still discarding)           */
 /* ------------------------------------------------------------------ */
 /* Takes the cards panel's slot while the deck is hidden, so the way back
    to the discard screen sits exactly where a thumb already is. */
@@ -793,16 +827,6 @@ button {
       "map cards";
   }
 
-  /* Hiding the cards panel would otherwise leave its 340px column
-     standing empty, so the grid drops to one column with the deck. */
-  .app--no-deck {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "topbar"
-      "scorebar"
-      "map";
-  }
-
   .topbar {
     grid-area: topbar;
   }
@@ -832,6 +856,11 @@ button {
     border-top: none;
     border-left: 1px solid var(--hairline);
     box-shadow: none;
+  }
+
+  /* The side panel's edge is the left one out here. */
+  .cards-panel--readonly {
+    border-left-color: var(--danger);
   }
 
   .cards-panel.expanded {
