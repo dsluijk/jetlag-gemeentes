@@ -6,7 +6,24 @@
  * the claim flow (detail -> confirm -> result) and the discard flow
  * (pick -> confirm -> result) can share one overlay and one render
  * function instead of five separate popups.
+ *
+ * The discard flow is the one view nobody opens on purpose: the rules
+ * make a discard mandatory after a claim, and the server refuses the
+ * next claim until it happens, so `Modal.blocking` turns the overlay
+ * into a full-screen wall. The one way past it is peeking (below), which
+ * trades the wall for a read-only board; only a completed discard puts
+ * the game back in the team's hands.
  */
+
+/**
+ * Set while the team is looking at the board instead of the discard
+ * screen they still owe. Everything the board can normally do is off in
+ * this mode - the deck is hidden, claiming is refused - so the only
+ * thing peeking buys is a look at where the gemeentes stand, which is
+ * exactly what you want before choosing what to throw away.
+ */
+let discardPeek = false;
+
 const UI = {
   init() {
     document
@@ -19,12 +36,15 @@ const UI = {
       if (e.target.id === "modal-overlay") Modal.close();
     });
 
-    document.getElementById("discard-btn").addEventListener("click", () => {
-      Modal.showDiscardPick();
-    });
+    document
+      .getElementById("discard-nag-btn")
+      .addEventListener("click", () => UI.resumeDiscard());
 
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") Modal.close();
+      if (e.key !== "Escape") return;
+      // Escape can't clear the debt, only step aside from it.
+      if (Modal.blocking) UI.peekBoard();
+      else Modal.close();
     });
   },
 
@@ -32,6 +52,7 @@ const UI = {
   render() {
     renderCardsPanel();
     renderScoreBar();
+    syncDiscardState();
   },
 
   openCardModal(name) {
@@ -41,6 +62,19 @@ const UI = {
       return;
     }
     Modal.showCardDetail(card);
+  },
+
+  /** Leave the discard screen for the read-only board behind it. */
+  peekBoard() {
+    discardPeek = true;
+    Modal.blocking = false;
+    Modal.close();
+  },
+
+  /** Back from the read-only board to the discard screen. */
+  resumeDiscard() {
+    discardPeek = false;
+    Modal.showDiscardPick();
   },
 
   toast(message, tone = "info") {
@@ -119,9 +153,40 @@ function renderScoreBar() {
     `;
     container.appendChild(chip);
   }
+}
 
-  const discardBtn = document.getElementById("discard-btn");
-  discardBtn.hidden = !State.canDiscard();
+/**
+ * Puts the whole app in (or out of) "you owe a discard" mode after every
+ * refresh: deck hidden, return bar shown, discard screen up unless the
+ * team stepped aside to read the board.
+ *
+ * A pending discard usually arrives while the claim result is still on
+ * screen, so an open modal is left alone - `Modal.close()` picks the
+ * discard up as soon as that modal is dismissed. The release case covers
+ * a teammate on another phone doing the discard for us: the wall comes
+ * down instead of sitting there waiting for a discard the server would
+ * now reject.
+ */
+function syncDiscardState() {
+  const owesDiscard = State.canDiscard();
+
+  // The deck is what the team would be tempted to shop around in; the
+  // map and scores are what they need to choose well, so only the panel
+  // goes away.
+  document.getElementById("cards-panel").hidden = owesDiscard;
+  document.getElementById("discard-nag").hidden = !owesDiscard;
+  document.getElementById("app").classList.toggle("app--no-deck", owesDiscard);
+
+  if (!owesDiscard) {
+    discardPeek = false;
+    if (Modal.blocking) {
+      Modal.blocking = false;
+      Modal.close();
+    }
+    return;
+  }
+
+  if (!Modal.view && !discardPeek) Modal.showDiscardPick();
 }
 
 // ---------------------------------------------------------------------
@@ -131,6 +196,12 @@ function renderScoreBar() {
 const Modal = {
   view: null,
   context: {},
+  /**
+   * While set, the overlay is full-screen and `close()` does nothing -
+   * the only exits are finishing the discard or peeking, and both clear
+   * this flag themselves rather than going through `close()`.
+   */
+  blocking: false,
 
   showCardDetail(card) {
     this.view = "detail";
@@ -147,6 +218,7 @@ const Modal = {
   showDiscardPick() {
     this.view = "discard-pick";
     this.context = { selected: null, error: null };
+    this.blocking = true;
     this._open();
   },
 
@@ -159,13 +231,25 @@ const Modal = {
   showResult(kind, newCards) {
     this.view = "result";
     this.context = { kind, newCards };
-    this._render();
+    // The discard is settled by the time its result shows, so the wall
+    // comes down here - and `_open()` rather than `_render()` because
+    // the refresh behind the discard already closed the overlay.
+    this.blocking = false;
+    this._open();
   },
 
   close() {
+    if (this.blocking) return;
+
     this.view = null;
     this.context = {};
     document.getElementById("modal-overlay").hidden = true;
+
+    // A claim hands out a discard while its own result modal is still
+    // up; this is where that queued discard finally gets the screen.
+    // Peeking is the one case where closing a modal is meant to land on
+    // the board rather than back on the discard screen.
+    if (State.canDiscard() && !discardPeek) this.showDiscardPick();
   },
 
   _open() {
@@ -174,6 +258,10 @@ const Modal = {
   },
 
   _render() {
+    document
+      .getElementById("modal-overlay")
+      .classList.toggle("modal-overlay--blocking", this.blocking);
+
     const content = document.getElementById("modal-content");
     content.innerHTML = "";
     content.appendChild(this._buildView());
@@ -226,6 +314,17 @@ function buildDetailView(context) {
   wrap
     .querySelector(".modal-close")
     .addEventListener("click", () => Modal.close());
+
+  // Peeking at the board with a discard outstanding: the card is still
+  // worth reading, but the server would reject a claim anyway, so the
+  // whole claim block stays out rather than failing on tap.
+  if (card.card_state !== "Claimed" && State.canDiscard()) {
+    const note = document.createElement("p");
+    note.className = "modal-tag";
+    note.textContent = "Discard a card first to claim anything else.";
+    wrap.appendChild(note);
+    return wrap;
+  }
 
   if (card.card_state !== "Claimed") {
     const actions = document.createElement("div");
@@ -339,25 +438,39 @@ async function performClaim(card, targetName, triggerBtn) {
 function buildDiscardPickView(context) {
   const { error } = context;
   const wrap = document.createElement("div");
+  wrap.className = "discard-screen";
   const publicCards = State.publicBoardCards();
 
   wrap.innerHTML = `
-    <div class="modal-header">
-      <h2>Discard a card</h2>
-      <button type="button" class="modal-close" aria-label="Close">&times;</button>
-    </div>
-    <p class="modal-description">Pick a card from the public board to send back to the deck.</p>
+    <p class="discard-screen__eyebrow">Before you play</p>
+    <h2 class="discard-screen__title">Discard a card</h2>
     ${error ? `<p class="modal-error">${escapeHtml(error)}</p>` : ""}
   `;
-  wrap
-    .querySelector(".modal-close")
-    .addEventListener("click", () => Modal.close());
 
+  // Shouldn't happen - a claim replenishes the board it emptied - but a
+  // blocking screen with nothing to click would brick the game, so leave
+  // a way to refetch rather than a dead end.
   if (publicCards.length === 0) {
     const empty = document.createElement("p");
     empty.className = "modal-description";
-    empty.textContent = "There are no cards on the public board right now.";
+    empty.textContent =
+      "There are no cards on the public board right now. Refresh to look again.";
     wrap.appendChild(empty);
+
+    const actions = document.createElement("div");
+    actions.className = "modal-actions";
+    const refreshBtn = document.createElement("button");
+    refreshBtn.type = "button";
+    refreshBtn.className = "btn btn--ghost";
+    refreshBtn.textContent = "Refresh";
+    refreshBtn.addEventListener("click", async () => {
+      refreshBtn.disabled = true;
+      await window.refreshAll();
+      if (Modal.view === "discard-pick") Modal.showDiscardPick();
+    });
+    actions.appendChild(buildPeekButton());
+    actions.appendChild(refreshBtn);
+    wrap.appendChild(actions);
     return wrap;
   }
 
@@ -388,27 +501,33 @@ function buildDiscardPickView(context) {
   discardBtn.textContent = "Discard";
   discardBtn.disabled = true;
   discardBtn.addEventListener("click", () => Modal.showDiscardConfirm());
+  actions.appendChild(buildPeekButton());
   actions.appendChild(discardBtn);
   wrap.appendChild(actions);
 
   return wrap;
 }
 
+/** The way out of the discard screen: the board, minus everything you can do to it. */
+function buildPeekButton() {
+  const peekBtn = document.createElement("button");
+  peekBtn.type = "button";
+  peekBtn.className = "btn btn--ghost";
+  peekBtn.textContent = "View the board";
+  peekBtn.addEventListener("click", () => UI.peekBoard());
+  return peekBtn;
+}
+
 function buildDiscardConfirmView(context) {
   const { selected, error } = context;
   const wrap = document.createElement("div");
+  wrap.className = "discard-screen discard-screen--centered";
 
   wrap.innerHTML = `
-    <div class="modal-header">
-      <h2>Are you sure?</h2>
-      <button type="button" class="modal-close" aria-label="Close">&times;</button>
-    </div>
+    <h2 class="discard-screen__title">Are you sure?</h2>
     <p class="modal-description">Discard <strong>${escapeHtml(selected.card_name)}</strong> and draw a new card onto the public board?</p>
     ${error ? `<p class="modal-error">${escapeHtml(error)}</p>` : ""}
   `;
-  wrap
-    .querySelector(".modal-close")
-    .addEventListener("click", () => Modal.close());
 
   const actions = document.createElement("div");
   actions.className = "modal-actions";
@@ -442,6 +561,10 @@ async function performDiscard(card, triggerBtn) {
       State.myTeamColor,
       card.card_id,
     );
+    // The debt is paid server-side; clear it locally too, so a refresh
+    // that fails right after can't leave the blocking screen stuck up.
+    const team = State.myTeam();
+    if (team) team.can_discard_card = false;
     await window.refreshAll();
     Modal.showResult("discard", newCard ? [newCard] : []);
   } catch (err) {

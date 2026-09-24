@@ -25,7 +25,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.001ms !important;
     transition-duration: 0.001ms !important;
   }
@@ -34,7 +36,9 @@
 /* ------------------------------------------------------------------ */
 /* Reset & base                                                         */
 /* ------------------------------------------------------------------ */
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 /* The `hidden` attribute is how we show/hide the modal overlay, the
    fatal-error screen, and the app shell. Several rules below set
@@ -46,7 +50,8 @@
   display: none !important;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   margin: 0;
 }
@@ -122,14 +127,22 @@ button {
   display: grid;
   place-items: center;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.4s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.4s ease;
 }
 
-.icon-btn:hover { background: var(--hairline); }
-.icon-btn.spinning svg { animation: spin 0.7s linear infinite; }
+.icon-btn:hover {
+  background: var(--hairline);
+}
+.icon-btn.spinning svg {
+  animation: spin 0.7s linear infinite;
+}
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -171,7 +184,9 @@ button {
   flex: 0 0 auto;
 }
 
-.score-chip__name { color: var(--ink-muted); }
+.score-chip__name {
+  color: var(--ink-muted);
+}
 
 .score-chip__value {
   font-family: var(--font-display);
@@ -194,16 +209,38 @@ button {
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.1s ease, opacity 0.15s ease;
+  transition:
+    transform 0.1s ease,
+    opacity 0.15s ease;
 }
 
-.btn:active { transform: scale(0.97); }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
 
-.btn--primary { background: var(--accent); color: var(--accent-ink); }
-.btn--ghost { background: transparent; color: var(--ink); border: 1px solid var(--hairline); }
-.btn--danger { background: var(--danger); color: var(--danger-ink); }
-.btn--small { padding: 0.45rem 0.8rem; font-size: 0.85rem; flex: 0 0 auto; }
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn--ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+}
+.btn--danger {
+  background: var(--danger);
+  color: var(--danger-ink);
+}
+.btn--small {
+  padding: 0.45rem 0.8rem;
+  font-size: 0.85rem;
+  flex: 0 0 auto;
+}
 
 /* ------------------------------------------------------------------ */
 /* Map                                                                  */
@@ -304,8 +341,12 @@ button {
   filter: drop-shadow(3px 3px 3px #333);
 }
 
-.playing-card:hover { transform: translateY(-2px); }
-.playing-card:active { transform: translateY(0) scale(0.98); }
+.playing-card:hover {
+  transform: translateY(-2px);
+}
+.playing-card:active {
+  transform: translateY(0) scale(0.98);
+}
 
 .playing-card--wild {
   background: repeating-linear-gradient(
@@ -354,8 +395,14 @@ button {
 }
 
 @keyframes slide-up {
-  from { transform: translateY(24px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .modal-header {
@@ -479,6 +526,135 @@ button {
 }
 
 /* ------------------------------------------------------------------ */
+/* Blocking screen (the mandatory discard)                              */
+/* ------------------------------------------------------------------ */
+/* A discard the rules already owe isn't a dialog you dismiss, so the
+   overlay stops behaving like a sheet: it fills the viewport, hides
+   nothing behind a tap target, and carries no close button. The two-class
+   selectors are deliberate - they have to outrank the wide-screen
+   .modal-overlay / .modal-sheet rules further down the file. */
+.modal-overlay.modal-overlay--blocking {
+  align-items: stretch;
+  background: rgba(34, 33, 28, 0.82);
+}
+
+.modal-overlay--blocking .modal-sheet {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+  padding: 1.5rem 1.1rem calc(1.4rem + env(safe-area-inset-bottom, 0px));
+  /* The card list scrolls on its own below, so the screen itself
+     shouldn't - that's what keeps the Discard button in reach. */
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: fade-in 0.18s ease;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-overlay--blocking #modal-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.discard-screen {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.discard-screen--centered {
+  justify-content: center;
+  text-align: center;
+}
+
+.discard-screen__eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--danger);
+  margin: 0 0 0.4rem;
+}
+
+.discard-screen__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.6rem;
+  margin: 0 0 0.5rem;
+}
+
+.discard-screen .discard-list {
+  flex: 1 1 auto;
+  max-height: none;
+  gap: 0.5rem;
+  padding-right: 0.15rem; /* breathing room for the scrollbar */
+}
+
+.discard-screen .discard-option {
+  padding: 0.85rem 0.9rem;
+  font-size: 1rem;
+}
+
+/* Thumb-sized and full width: this screen is the only thing on it. */
+.discard-screen .modal-actions {
+  flex: 0 0 auto;
+}
+
+.discard-screen .modal-actions .btn {
+  flex: 1 1 0;
+  padding-top: 0.8rem;
+  padding-bottom: 0.8rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Read-only bar (the board while a discard is still owed)              */
+/* ------------------------------------------------------------------ */
+/* Takes the cards panel's slot while the deck is hidden, so the way back
+   to the discard screen sits exactly where a thumb already is. */
+.discard-nag {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.85rem 1rem calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  background: var(--danger-ink);
+  border-top: 2px solid var(--danger);
+  box-shadow: var(--shadow-sheet);
+}
+
+.discard-nag__text {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--danger);
+  text-align: center;
+}
+
+.discard-nag__btn {
+  width: 100%;
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  font-size: 1rem;
+}
+
+/* ------------------------------------------------------------------ */
 /* Toasts                                                               */
 /* ------------------------------------------------------------------ */
 .toast-container {
@@ -501,11 +677,18 @@ button {
   font-size: 0.85rem;
   opacity: 0;
   transform: translateY(8px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
-.toast--visible { opacity: 1; transform: translateY(0); }
-.toast--error { background: var(--danger); }
+.toast--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.toast--error {
+  background: var(--danger);
+}
 
 /* ------------------------------------------------------------------ */
 /* Fatal error screen                                                   */
@@ -610,9 +793,38 @@ button {
       "map cards";
   }
 
-  .topbar { grid-area: topbar; }
-  .score-bar { grid-area: scorebar; }
-  .map-wrap { grid-area: map; }
+  /* Hiding the cards panel would otherwise leave its 340px column
+     standing empty, so the grid drops to one column with the deck. */
+  .app--no-deck {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "topbar"
+      "scorebar"
+      "map";
+  }
+
+  .topbar {
+    grid-area: topbar;
+  }
+  .score-bar {
+    grid-area: scorebar;
+  }
+  .map-wrap {
+    grid-area: map;
+  }
+
+  .discard-nag {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+  }
+
+  .discard-nag__btn {
+    width: auto;
+    flex: 0 0 auto;
+  }
 
   .cards-panel {
     grid-area: cards;
@@ -622,10 +834,16 @@ button {
     box-shadow: none;
   }
 
-  .cards-panel.expanded { max-height: none; }
+  .cards-panel.expanded {
+    max-height: none;
+  }
 
-  .cards-panel__handle { cursor: default; }
-  .cards-panel__grip { display: none; }
+  .cards-panel__handle {
+    cursor: default;
+  }
+  .cards-panel__grip {
+    display: none;
+  }
 
   .cards-list {
     flex-wrap: wrap;
@@ -633,7 +851,9 @@ button {
     overflow-x: hidden;
   }
 
-  .modal-overlay { align-items: center; }
+  .modal-overlay {
+    align-items: center;
+  }
 
   .modal-sheet {
     border-radius: var(--radius-lg);
@@ -641,7 +861,13 @@ button {
   }
 
   @keyframes pop-in {
-    from { transform: scale(0.96); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+    from {
+      transform: scale(0.96);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 }
