@@ -2,9 +2,10 @@
 Static source data used to seed a new game's deck.
 
 GEMEENTES become regular challenge cards; WILD_CARDS become wild cards.
-Challenge title/description are intentionally left empty at seed time -
-fill those in separately (e.g. a follow-up admin endpoint or a seed
-script) once the actual challenge text is ready.
+The challenge text for each of them lives in app/challenges.py, which is
+generated from challenges.csv by scripts/import_challenges.py - see the
+README. The Challenge type those entries use is defined here, next to the
+card names, so regenerating that file never rewrites the type.
 """
 
 import math
@@ -12,7 +13,19 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Iterator, List, Set, Tuple
+from typing import Dict, Iterator, List, NamedTuple, Set, Tuple
+
+
+class Challenge(NamedTuple):
+    """The challenge text on a card. Either field may be empty."""
+
+    title: str
+    description: str
+
+
+# Used for any card that has no entry in CHALLENGES, so a stale generated
+# file yields a blank card instead of breaking game creation.
+EMPTY_CHALLENGE = Challenge(title="", description="")
 
 GEMEENTES = [
     "Aalten",
@@ -77,11 +90,16 @@ GEMEENTES = [
     "Zwolle",
 ]
 
+# New wild cards are appended rather than inserted: a card's card_id is its
+# position in GEMEENTES + WILD_CARDS, so appending leaves the ids of every
+# existing card alone.
 WILD_CARDS = [
     "Pieterpad Wild Card",
     "Nationale parken Wild Card",
     "Burger King Wild Card",
     "Station Wild Card",
+    "Intratuin Wild Card",
+    "Kinderboerderij Wild Card",
 ]
 
 

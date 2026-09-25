@@ -71,8 +71,9 @@ normal response, not a 404.
 ### `POST /{game_id}/create`
 
 Creates a game: registers teams, seeds the full deck (all gemeentes +
-wild cards, `InDeck`, empty challenge text), deals 4 random cards to each
-team's private board, and reveals 7 random cards on the public board.
+wild cards, `InDeck`, each with its challenge text from
+[Importing challenges](#importing-challenges)), deals 4 random cards to
+each team's private board, and reveals 7 random cards on the public board.
 
 Body:
 
@@ -239,21 +240,49 @@ jetlag-api/
 │   ├── models.py       # ORM data model: Card, Team, CardState, TeamColor
 │   ├── database.py     # engine/session setup, driven by DATABASE_URL
 │   ├── game_data.py    # static gemeente + wild card list used to seed a deck
+│   ├── challenges.py   # generated: challenge text per card (see below)
 │   ├── schemas.py       # request/response schemas that aren't 1:1 with a table
 │   ├── services.py      # game logic: seeding, random draws, visibility, claim/discard
 │   ├── routers/
 │   │   ├── __init__.py
 │   │   └── games.py     # the game endpoints
 │   └── main.py          # FastAPI app entrypoint
+├── scripts/
+│   └── import_challenges.py  # challenges.csv -> app/challenges.py
 ├── requirements.txt
 ├── .env.example
 └── README.md
 ```
 
+## Importing challenges
+
+`challenges.csv` - a Google Sheets export - is the source of truth for the
+challenge title and description of every card. It is gitignored and lives
+only on whoever's machine exported it: `app/challenges.py` is generated
+from it and committed, so the app never needs the CSV at all, at runtime
+or in a checkout.
+
+After re-exporting the sheet into the repo root, regenerate the module:
+
+```bash
+python -m scripts.import_challenges            # --dry-run to only see the report
+```
+
+It prints how many cards have text, which ones are still empty, and which
+took their description from the column next to `Challenge description`
+(someone typed one cell too far right - worth fixing in the sheet). It
+refuses to write anything if a card name in the sheet isn't in `GEMEENTES`
+or `WILD_CARDS`, or if a card in the deck has no row, so the deck and the
+sheet can't silently drift apart. Columns are matched by their header text
+rather than position, so inserting a column in the sheet is safe.
+
+Cards whose challenge hasn't been written yet seed with empty text, which
+the frontend renders as a card with no description.
+
 ## Next steps
 
-- Populate real `challenge_title` / `challenge_description` text for each
-  gemeente (currently seeded empty).
+- Write the challenges that are still empty (see the importer's report) and
+  re-run it.
 - Add auth so one team can't act as another.
 - Consider row-level locking (`SELECT ... FOR UPDATE`, PostgreSQL only)
   around the random-draw queries if you expect concurrent requests for

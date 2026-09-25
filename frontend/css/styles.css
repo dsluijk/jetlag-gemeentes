@@ -455,11 +455,6 @@ button {
   margin: 0 0 0.6rem;
 }
 
-.modal-challenge-title {
-  font-weight: 600;
-  margin: 0 0 0.3rem;
-}
-
 .modal-description {
   color: var(--ink);
   line-height: 1.5;
@@ -505,6 +500,104 @@ button {
   display: flex;
   gap: 0.6rem;
   justify-content: flex-end;
+}
+
+/* ------------------------------------------------------------------ */
+/* Card detail (the challenge behind a card)                            */
+/* ------------------------------------------------------------------ */
+/* Blown up from .playing-card, so the sheet reads as the card the team
+   just tapped: the gemeente sits above the challenge as a kicker, the
+   accent rule stands in for the card's edge, and the challenge text gets
+   its own panel rather than running on as loose body copy. */
+
+/* Outranks the generic `.modal-header h2` above - that rule is one
+   element more specific than a lone class. */
+.modal-header .card-detail__title {
+  font-size: 1.5rem;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+.card-detail__kicker {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+}
+
+/* The pill is its own thing - it shouldn't pick up the kicker's caps and
+   tracking just because it sits inside one. */
+.card-detail__kicker .modal-badge {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.card-detail__rule {
+  display: block;
+  width: 2.5rem;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--accent);
+  margin: 0 0 0.85rem;
+}
+
+/* Echoes the stripes a wild card wears in the deck. */
+.card-detail--wild .card-detail__rule {
+  width: 3.5rem;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--accent),
+    var(--accent) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+.card-detail__claimed {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  margin: 0 0 0.7rem;
+}
+
+.card-detail__claimed-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+}
+
+/* `pre-wrap` because the imported challenge text carries its own line
+   breaks, and `anywhere` because a fair few end in a long URL that would
+   otherwise push the sheet sideways. */
+.card-detail__body {
+  background: var(--paper);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.85rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0 0 0.9rem;
+}
+
+/* Nothing written yet is a note about the card, not the card's text. */
+.card-detail__body--empty {
+  background: none;
+  border: none;
+  padding: 0;
+  font-style: italic;
+  color: var(--ink-muted);
 }
 
 /* The focus ring is drawn 4px outside an option's border box, and a

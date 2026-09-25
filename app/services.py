@@ -11,7 +11,8 @@ from typing import List, Optional
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from app.game_data import GEMEENTES, WILD_CARDS
+from app.challenges import CHALLENGES
+from app.game_data import EMPTY_CHALLENGE, GEMEENTES, WILD_CARDS
 from app.models import Card, CardState, Team, TeamColor
 from app.schemas import GameSummary, TeamCreate
 
@@ -184,28 +185,34 @@ def create_game(session: Session, game_id: str, teams: List[TeamCreate]) -> Game
         for t in teams:
             session.add(Team(game_id=game_id, team_color=t.team_color, team_name=t.team_name))
 
-        # 2. Seed the full deck: all gemeentes + wild cards, InDeck, no
-        #    challenge text yet.
+        # 2. Seed the full deck: all gemeentes + wild cards, InDeck, with the
+        #    challenge text imported from the sheet. A card whose challenge
+        #    hasn't been written yet just gets empty text - the front end
+        #    renders that fine - and so does one missing from CHALLENGES
+        #    altogether, so an out-of-date app/challenges.py degrades to a
+        #    blank card instead of breaking game creation.
         card_id = 1
         for name in GEMEENTES:
+            challenge = CHALLENGES.get(name, EMPTY_CHALLENGE)
             session.add(Card(
                 game_id=game_id,
                 card_id=card_id,
                 card_name=name,
                 card_state=CardState.IN_DECK,
-                challenge_title="",
-                challenge_description="In the semifinals of the men's soccor world championship, Giovanni van Bronckhorst scored his furthest goal ever, from 37 meter, which helpen us beat Uruguay 3-2. Find a goal that is unmistakenly used to play soccer. Each team member must score their own Van Bronckhorst 'Magical Goal' from a distance of 37 meters. https://www.youtube.com/watch?v=JVQmWZoNHG4 ",
+                challenge_title=challenge.title,
+                challenge_description=challenge.description,
                 is_wild_card=False,
             ))
             card_id += 1
         for name in WILD_CARDS:
+            challenge = CHALLENGES.get(name, EMPTY_CHALLENGE)
             session.add(Card(
                 game_id=game_id,
                 card_id=card_id,
                 card_name=name,
                 card_state=CardState.IN_DECK,
-                challenge_title="",
-                challenge_description="",
+                challenge_title=challenge.title,
+                challenge_description=challenge.description,
                 is_wild_card=True,
             ))
             card_id += 1
