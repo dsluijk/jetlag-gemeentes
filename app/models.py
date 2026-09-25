@@ -53,6 +53,7 @@ class Card(SQLModel, table=True):
 
     challenge_title: str
     challenge_description: str
+    challenge_link: Optional[str] = Field(default=None)
 
     # Optional fields
     visible_from: Optional[datetime] = Field(default=None)

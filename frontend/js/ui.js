@@ -387,6 +387,11 @@ function buildDetailView(context) {
         ? escapeHtml(card.challenge_description)
         : "No challenge text has been added for this card yet."
     }</p>
+    ${
+      card.challenge_link
+        ? `<p class="modal-link"><a href="${escapeHtml(card.challenge_link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(card.challenge_link)}</a></p>`
+        : ""
+    }
     ${error ? `<p class="modal-error">${escapeHtml(error)}</p>` : ""}
   `;
 
