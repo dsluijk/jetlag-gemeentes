@@ -194,7 +194,8 @@ def create_game(session: Session, game_id: str, teams: List[TeamCreate]) -> Game
                 card_name=name,
                 card_state=CardState.IN_DECK,
                 challenge_title="",
-                challenge_description="In the semifinals of the men's soccor world championship, Giovanni van Bronckhorst scored his furthest goal ever, from 37 meter, which helpen us beat Uruguay 3-2. Find a goal that is unmistakenly used to play soccer. Each team member must score their own Van Bronckhorst 'Magical Goal' from a distance of 37 meters. https://www.youtube.com/watch?v=JVQmWZoNHG4 ",
+                challenge_description="In the semifinals of the men's soccor world championship, Giovanni van Bronckhorst scored his furthest goal ever, from 37 meter, which helpen us beat Uruguay 3-2. Find a goal that is unmistakenly used to play soccer. Each team member must score their own Van Bronckhorst 'Magical Goal' from a distance of 37 meters.",
+                challenge_link="https://www.youtube.com/watch?v=JVQmWZoNHG4",
                 is_wild_card=False,
             ))
             card_id += 1

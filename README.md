@@ -41,6 +41,7 @@ Composite primary key: `(game_id, card_id)`.
 | card_state            | enum `CardState`      | InDeck / OnPublicBoard / OnPrivateBoard / Claimed |
 | challenge_title       | str                   |                                                   |
 | challenge_description | str                   |                                                   |
+| challenge_link        | str, optional         | shown as a link under the description             |
 | visible_from          | datetime, optional    |                                                   |
 | private_board_team    | str, optional         |                                                   |
 | claimed_team          | str, optional         |                                                   |
@@ -252,8 +253,8 @@ jetlag-api/
 
 ## Next steps
 
-- Populate real `challenge_title` / `challenge_description` text for each
-  gemeente (currently seeded empty).
+- Populate real `challenge_title` / `challenge_description` / `challenge_link`
+  text for each gemeente (currently seeded empty).
 - Add auth so one team can't act as another.
 - Consider row-level locking (`SELECT ... FOR UPDATE`, PostgreSQL only)
   around the random-draw queries if you expect concurrent requests for
