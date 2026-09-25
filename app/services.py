@@ -8,7 +8,8 @@ from __future__ import annotations
 from datetime import datetime, time
 from typing import List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import and_, func
+from sqlalchemy.orm.session import make_transient
 from sqlmodel import Session, select
 
 from app.game_data import GEMEENTES, WILD_CARDS
@@ -72,8 +73,8 @@ def draw_random_cards(session: Session, game_id: str, state: CardState, count: i
     flushed, it drops out of the pool for the next draw.
     """
     statement = (
-        select(Card)
-        .where(Card.game_id == game_id, Card.card_state == state)
+        _current_cards(game_id)
+        .where(Card.card_state == state)
         .order_by(func.random())
         .limit(count)
     )
@@ -105,7 +106,7 @@ def card_visible_to_team(card: Card, team_color: TeamColor, now: Optional[dateti
 def get_visible_cards(session: Session, game_id: str, team_color: TeamColor) -> List[Card]:
     """All cards currently visible to `team_color`, per card_visible_to_team."""
     now = datetime.utcnow()
-    all_cards = session.exec(select(Card).where(Card.game_id == game_id)).all()
+    all_cards = session.exec(_current_cards(game_id)).all()
     return [c for c in all_cards if card_visible_to_team(c, team_color, now)]
 
 
@@ -164,10 +165,41 @@ def list_games(session: Session) -> List[GameSummary]:
 
 
 def get_card_or_raise(session: Session, game_id: str, card_id: int) -> Card:
-    card = session.get(Card, (game_id, card_id))
+    card = _current_cards(game_id).where(Card.card_id == card_id)
+    card = session.exec(card).first()
     if card is None:
         raise CardNotFoundError(f"Card {card_id} not found in game '{game_id}'.")
     return card
+
+
+def _current_cards(game_id: str, when: Optional[datetime] = None):
+    latest_versions = (
+        select(
+            Card.game_id.label("game_id"),
+            Card.card_id.label("card_id"),
+            func.max(Card.updated_timestamp).label("updated_timestamp"),
+        )
+        .where(Card.game_id == game_id)
+    )
+    if when:
+        latest_versions = latest_versions.where(Card.updated_timestamp <= when)
+    latest_versions = (
+        latest_versions
+        .group_by(Card.game_id, Card.card_id)
+        .subquery()
+    )
+    return (
+        select(Card)
+        .join(
+            latest_versions,
+            and_(
+                Card.game_id == latest_versions.c.game_id,
+                Card.card_id == latest_versions.c.card_id,
+                Card.updated_timestamp == latest_versions.c.updated_timestamp,
+            ),
+        )
+        .where(Card.game_id == game_id)
+    )
 
 
 # --------------------------------------------------------------------------
@@ -263,12 +295,20 @@ class GameCreationResult:
 # PUT /{game_id}/{team_color}/claim/{card_id}
 # --------------------------------------------------------------------------
 
+def _clone_card(session: Session, card: Card) -> Card:
+    # remove the object from the session (set its state to detached)
+    session.expunge(card)
+    # make it transient (set its state to transient)
+    make_transient(card)
+    return card
+
+
 def _replenish_public_board(session: Session, game_id: str) -> Card:
     """Draw 1 random InDeck card and move it to the public board."""
     drawn = draw_random_cards(session, game_id, CardState.IN_DECK, 1)
     if not drawn:
         raise InvalidActionError("No cards left in the deck to replenish the public board.")
-    new_card = drawn[0]
+    new_card = _clone_card(session, drawn[0])
     new_card.card_state = CardState.ON_PUBLIC_BOARD
     new_card.updated_timestamp = datetime.utcnow()
     session.add(new_card)
@@ -316,6 +356,7 @@ def claim_card(
         new_cards: List[Card] = []
         was_public_card = card.card_state == CardState.ON_PUBLIC_BOARD
 
+        card = _clone_card(session, card)
         card.card_state = CardState.CLAIMED
         card.claimed_team = team_color.value
         card.updated_timestamp = now
@@ -339,6 +380,7 @@ def claim_card(
 
             target_card_was_public = target_card.card_state == CardState.ON_PUBLIC_BOARD
 
+            target_card = _clone_card(session, target_card)
             target_card.card_state = CardState.CLAIMED
             target_card.claimed_team = team_color.value
             target_card.updated_timestamp = now
@@ -380,6 +422,7 @@ def discard_card(session: Session, game_id: str, team_color: TeamColor, card_id:
         raise InvalidActionError(f"Team '{team_color.value}' is not currently allowed to discard.")
 
     try:
+        card = _clone_card(session, card)
         card.card_state = CardState.IN_DECK
         card.private_board_team = None
         card.claimed_team = None
