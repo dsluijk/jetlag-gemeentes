@@ -408,6 +408,11 @@ function buildDetailView(context) {
       card.challenge_description
         ? `<p class="card-detail__body">${escapeHtml(card.challenge_description)}</p>`
         : `<p class="card-detail__body card-detail__body--empty">No challenge text has been added for this card yet.</p>`
+    }</p>
+    ${
+      card.challenge_link
+        ? `<p class="modal-link"><a href="${escapeHtml(card.challenge_link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(card.challenge_link)}</a></p>`
+        : ""
     }
     ${error ? `<p class="modal-error">${escapeHtml(error)}</p>` : ""}
   `;

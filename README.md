@@ -41,6 +41,7 @@ Composite primary key: `(game_id, card_id)`.
 | card_state            | enum `CardState`      | InDeck / OnPublicBoard / OnPrivateBoard / Claimed |
 | challenge_title       | str                   |                                                   |
 | challenge_description | str                   |                                                   |
+| challenge_link        | str, optional         | shown as a link under the description             |
 | visible_from          | datetime, optional    |                                                   |
 | private_board_team    | str, optional         |                                                   |
 | claimed_team          | str, optional         |                                                   |
