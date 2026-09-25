@@ -58,7 +58,7 @@ class InvalidActionError(GameServiceError):
 # Random card selection
 # --------------------------------------------------------------------------
 
-def draw_random_cards(session: Session, game_id: str, state: CardState, count: int) -> List[Card]:
+def draw_random_cards(session: Session, game_id: str, state: CardState, count: int, include_wildcards: bool = True) -> List[Card]:
     """
     Draw up to `count` random cards for a game currently in `state`.
 
@@ -76,6 +76,11 @@ def draw_random_cards(session: Session, game_id: str, state: CardState, count: i
     statement = (
         _current_cards(game_id)
         .where(Card.card_state == state)
+    )
+    if not include_wildcards:
+        statement = statement.where(Card.is_wild_card == False)
+    statement = (
+        statement
         .order_by(func.random())
         .limit(count)
     )
@@ -213,6 +218,7 @@ def create_game(session: Session, game_id: str, teams: List[TeamCreate]) -> Game
         raise GameAlreadyExistsError(f"Game '{game_id}' already exists.")
 
     try:
+        now = datetime.utcnow()
         # 1. Teams
         for t in teams:
             session.add(Team(game_id=game_id, team_color=t.team_color, team_name=t.team_name))
@@ -255,9 +261,9 @@ def create_game(session: Session, game_id: str, teams: List[TeamCreate]) -> Game
         # 3. Deal 4 random private-board cards to each team, staggered
         #    reveal times. Flushing after each team's draw is what makes
         #    the *next* team's random draw exclude these cards.
-        today = datetime.utcnow().date()
+        today = now.date()
         for t in teams:
-            drawn = draw_random_cards(session, game_id, CardState.IN_DECK, PRIVATE_BOARD_CARDS_PER_TEAM)
+            drawn = draw_random_cards(session, game_id, CardState.IN_DECK, PRIVATE_BOARD_CARDS_PER_TEAM, include_wildcards=False)
             if len(drawn) < PRIVATE_BOARD_CARDS_PER_TEAM:
                 raise InvalidActionError(
                     "Not enough cards left in the deck to deal private boards to every team."
@@ -266,7 +272,7 @@ def create_game(session: Session, game_id: str, teams: List[TeamCreate]) -> Game
                 card.card_state = CardState.ON_PRIVATE_BOARD
                 card.private_board_team = t.team_color.value
                 card.visible_from = datetime.combine(today, reveal_time)
-                card.updated_timestamp = datetime.utcnow()
+                card.updated_timestamp = now
                 session.add(card)
             session.flush()
 
@@ -276,7 +282,7 @@ def create_game(session: Session, game_id: str, teams: List[TeamCreate]) -> Game
             raise InvalidActionError("Not enough cards left in the deck to fill the public board.")
         for card in public_cards:
             card.card_state = CardState.ON_PUBLIC_BOARD
-            card.updated_timestamp = datetime.utcnow()
+            card.updated_timestamp = now
             session.add(card)
         session.flush()
 
@@ -311,14 +317,14 @@ def _clone_card(session: Session, card: Card) -> Card:
     return card
 
 
-def _replenish_public_board(session: Session, game_id: str) -> Card:
+def _replenish_public_board(session: Session, game_id: str, now: datetime) -> Card:
     """Draw 1 random InDeck card and move it to the public board."""
     drawn = draw_random_cards(session, game_id, CardState.IN_DECK, 1)
     if not drawn:
         raise InvalidActionError("No cards left in the deck to replenish the public board.")
     new_card = _clone_card(session, drawn[0])
     new_card.card_state = CardState.ON_PUBLIC_BOARD
-    new_card.updated_timestamp = datetime.utcnow()
+    new_card.updated_timestamp = now
     session.add(new_card)
     session.flush()
     return new_card
@@ -396,11 +402,11 @@ def claim_card(
             session.flush()
             
             if target_card_was_public:
-                new_card = _replenish_public_board(session, game_id)
+                new_card = _replenish_public_board(session, game_id, now)
                 new_cards.append(new_card)
         
         if was_public_card:
-            new_card = _replenish_public_board(session, game_id)
+            new_card = _replenish_public_board(session, game_id, now)
             new_cards.append(new_card)
         
         team.can_discard_card = True
@@ -430,19 +436,20 @@ def discard_card(session: Session, game_id: str, team_color: TeamColor, card_id:
         raise InvalidActionError(f"Team '{team_color.value}' is not currently allowed to discard.")
 
     try:
+        now = datetime.utcnow()
         card = _clone_card(session, card)
         card.card_state = CardState.IN_DECK
         card.private_board_team = None
         card.claimed_team = None
         card.visible_from = None
-        card.updated_timestamp = datetime.utcnow()
+        card.updated_timestamp = now
         session.add(card)
 
         team.can_discard_card = False
         session.add(team)
 
         session.flush()
-        new_card = _replenish_public_board(session, game_id)
+        new_card = _replenish_public_board(session, game_id, now)
         session.commit()
     except Exception:
         session.rollback()
