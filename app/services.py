@@ -23,7 +23,8 @@ PUBLIC_BOARD_INITIAL_CARDS = 7
 # The 4 cards dealt to each team's private board get staggered reveal
 # times: 2 at 10:00, 1 at 12:00, 1 at 14:00 (today). Order doesn't matter
 # since the 4 cards themselves were already drawn randomly.
-PRIVATE_REVEAL_TIMES = [time(10, 0), time(10, 0), time(12, 0), time(14, 0)]
+# (Times below are programmed in UTC, meaning -2 compared to CEST summer time)
+PRIVATE_REVEAL_TIMES = [time(8, 0), time(8, 0), time(10, 0), time(12, 0)]
 
 
 # --------------------------------------------------------------------------
