@@ -73,6 +73,7 @@ normal response, not a 404.
 Creates a game: registers teams, seeds the full deck (all gemeentes +
 wild cards, `InDeck`, empty challenge text), deals 4 random cards to each
 team's private board, and reveals 7 random cards on the public board.
+Driven by the frontend's create page (`frontend/create.html`).
 
 Body:
 
@@ -80,7 +81,7 @@ Body:
 {
   "teams": [
     { "team_color": "orange", "team_name": "Team Oranje" },
-    { "team_color": "blue", "team_name": "Team Blauw" },
+    { "team_color": "pink", "team_name": "Team Roze" },
     { "team_color": "purple", "team_name": "Team Paars" }
   ]
 }
