@@ -97,7 +97,8 @@ at 10:00, 1 at 12:00, 1 at 14:00.
 Returns every team registered in the game (`team_color`, `team_name`,
 `can_discard_card`) - added for the frontend's score bar and to know
 when a team is currently allowed to discard. There's no per-team
-filtering: any client can see the full roster.
+filtering: any client can see the full roster, which is also how a team
+finds out that *another* team is discarding and the game is frozen.
 
 ### `GET /{game_id}/{team_color}/cards`
 
@@ -109,7 +110,14 @@ team), public-board cards, and that team's private-board cards whose
 ### `PUT /{game_id}/{team_color}/claim/{card_id}`
 
 Claims `card_id` for `team_color`, after checking it's visible to that
-team.
+team and that no discard is outstanding anywhere in the game.
+
+A mandatory discard freezes the whole game, not just the team that is
+discarding: while any team's `can_discard_card` is `True`, every claim in that
+game is refused with `400`. The error names the team being waited on so
+the frontend can say who's holding things up.
+`get_pending_discard_team()` in `app/services.py` is the one place that
+answers "is this game frozen, and by whom?".
 
 - Non-wild card: card -> `Claimed`, `claimed_team` set, and the team's
   `can_discard_card` is set to `True`.
@@ -128,7 +136,9 @@ Example: `PUT /ABC123/orange/claim/42?target_card_id=7`
 ### `PUT /{game_id}/{team_color}/discard/{card_id}`
 
 Requires `card_id` to be on the public board and the team's
-`can_discard_card` to be `True`. Resets the card to `InDeck`, resets
+`can_discard_card` to be `True` - only the team that is discarding can
+complete it, so this is also what refuses a team trying to unfreeze the
+game on someone else's behalf. Resets the card to `InDeck`, resets
 `can_discard_card` to `False`, draws 1 new random `InDeck` card onto the
 public board, and returns that new card.
 

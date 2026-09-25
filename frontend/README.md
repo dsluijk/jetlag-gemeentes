@@ -135,7 +135,7 @@ which is the device telling us what it actually is rather than us
 guessing in advance.
 
 The one piece of bookkeeping that needs is `_lastPointerType`: a finger
-tap fires a *synthetic* mousemove, which the ungated mouse handlers would
+tap fires a _synthetic_ mousemove, which the ungated mouse handlers would
 otherwise treat as a hover and highlight on every tap. Recording the last
 real pointer event lets them bail on touch. It's recorded on `pointerdown`
 as well as `pointermove`, because a tap never sends a pointermove at all.
@@ -144,6 +144,23 @@ as well as `pointermove`, because a tap never sends a pointermove at all.
 websockets - only the refresh button (spinner icon, top right), plus an
 automatic refresh right after your own claim/discard so you immediately
 see its effect. To see _other_ teams' moves, someone has to tap refresh.
+
+**The freeze**: a mandatory discard stops the whole game, not just the
+team that is discarding - nobody may claim until that card is gone - so every
+board is frozen behind the same full-screen wall. Frozen, not
+gone: the deck stays where it is and its cards still open, since reading
+them is how a team picks what to throw away and how everyone else follows
+what's on the table. They just don't offer a claim, the panel's handle
+says `frozen`, and its edge turns red to match the bar below it. The
+team that is discarding gets the picker - which carries a reminder to
+clear the pick with the other teams first, a discard being the one move the
+table gets a veto on; everyone else gets a waiting screen naming them,
+with a **Check again** button, and either screen can
+be stepped aside from to read the map (see `freezePeek` in `js/ui.js`).
+With no polling, a waiting board only thaws on the refresh that first
+sees the discard land - but the rule itself is the server's, so a claim
+sent from a board that hasn't refreshed yet comes back refused, and that
+refusal puts the waiting screen up rather than an error message.
 
 ## The basemap toggle
 

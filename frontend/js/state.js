@@ -102,9 +102,28 @@ const State = {
     return this.teams.find((t) => t.team_color === this.myTeamColor);
   },
 
+  /** True while *our* team is the one that is discarding. */
   canDiscard() {
     const team = this.myTeam();
     return Boolean(team && team.can_discard_card);
+  },
+
+  /**
+   * The team that is discarding a card, if any. At most one team can be
+   * discarding at a time, since the claim that hands a discard out is
+   * refused while another discard is still in progress.
+   */
+  pendingDiscardTeam() {
+    return this.teams.find((t) => t.can_discard_card);
+  },
+
+  /**
+   * True while any team is discarding. A discard in progress freezes the
+   * whole game - not just the team that is discarding - so every board
+   * goes frozen until that card is discarded, ours included.
+   */
+  isFrozen() {
+    return Boolean(this.pendingDiscardTeam());
   },
 
   /** Names of gemeentes claimed by anyone - always complete, since Claimed cards are visible to every team. */

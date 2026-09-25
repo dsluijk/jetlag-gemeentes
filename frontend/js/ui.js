@@ -13,16 +13,25 @@
  * into a full-screen wall. The one way past it is peeking (below), which
  * trades the wall for a read-only board; only a completed discard puts
  * the game back in the team's hands.
+ *
+ * That wall goes up on *every* team's board, not just on the one that
+ * is discarding: a discard in progress freezes the whole game. The teams
+ * who aren't the one discarding get the waiting screen instead of the
+ * picker, but
+ * otherwise the same treatment - claiming refused, the deck readable but
+ * unplayable - since nobody may move until that card is gone.
  */
 
 /**
- * Set while the team is looking at the board instead of the discard
- * screen they still owe. Everything the board can normally do is off in
- * this mode - the deck is hidden, claiming is refused - so the only
- * thing peeking buys is a look at where the gemeentes stand, which is
- * exactly what you want before choosing what to throw away.
+ * Set while the team is looking at the board instead of the freeze screen
+ * (the discard picker, or the waiting screen when it's someone else's
+ * discard). Everything the board can normally *do* is off in this mode -
+ * claiming is refused, and the deck is there to read rather than to play
+ * from - so all peeking buys is a look at where the gemeentes stand and
+ * what's on the table, which is exactly what you want before choosing
+ * what to throw away, or while waiting out a team that's choosing.
  */
-let discardPeek = false;
+let freezePeek = false;
 
 const UI = {
   init() {
@@ -38,11 +47,11 @@ const UI = {
 
     document
       .getElementById("discard-nag-btn")
-      .addEventListener("click", () => UI.resumeDiscard());
+      .addEventListener("click", () => UI.resumeFreezeScreen());
 
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
-      // Escape can't clear the debt, only step aside from it.
+      // Escape can't finish the discard, only step aside from it.
       if (Modal.blocking) UI.peekBoard();
       else Modal.close();
     });
@@ -52,7 +61,7 @@ const UI = {
   render() {
     renderCardsPanel();
     renderScoreBar();
-    syncDiscardState();
+    syncFreezeState();
   },
 
   openCardModal(name) {
@@ -64,17 +73,17 @@ const UI = {
     Modal.showCardDetail(card);
   },
 
-  /** Leave the discard screen for the read-only board behind it. */
+  /** Leave the freeze screen for the frozen board behind it. */
   peekBoard() {
-    discardPeek = true;
+    freezePeek = true;
     Modal.blocking = false;
     Modal.close();
   },
 
-  /** Back from the read-only board to the discard screen. */
-  resumeDiscard() {
-    discardPeek = false;
-    Modal.showDiscardPick();
+  /** Back from the frozen board to the freeze screen. */
+  resumeFreezeScreen() {
+    freezePeek = false;
+    showFreezeScreen();
   },
 
   toast(message, tone = "info") {
@@ -97,8 +106,12 @@ const UI = {
 
 function renderCardsPanel() {
   const cards = State.panelCards();
-  document.getElementById("cards-count").textContent =
-    cards.length === 1 ? "1 card" : `${cards.length} cards`;
+  // A frozen deck looks exactly like a playable one - same cards, still
+  // tappable to read - so the handle is where that difference gets said.
+  const count = cards.length === 1 ? "1 card" : `${cards.length} cards`;
+  document.getElementById("cards-count").textContent = State.isFrozen()
+    ? `${count} · frozen`
+    : count;
 
   const list = document.getElementById("cards-list");
   list.innerHTML = "";
@@ -156,29 +169,51 @@ function renderScoreBar() {
 }
 
 /**
- * Puts the whole app in (or out of) "you owe a discard" mode after every
- * refresh: deck hidden, return bar shown, discard screen up unless the
- * team stepped aside to read the board.
+ * Puts the whole app in (or out of) frozen mode after every refresh: deck
+ * flagged read-only, return bar shown, freeze screen up unless the team
+ * stepped aside to read the board.
  *
- * A pending discard usually arrives while the claim result is still on
- * screen, so an open modal is left alone - `Modal.close()` picks the
- * discard up as soon as that modal is dismissed. The release case covers
- * a teammate on another phone doing the discard for us: the wall comes
- * down instead of sitting there waiting for a discard the server would
- * now reject.
+ * Which freeze screen that is depends on whose discard it is, but the
+ * lockout itself doesn't: a team waiting on someone else's discard can't
+ * claim either, so their board is shut down just as thoroughly. Only the
+ * copy differs, since they have nothing to do about it but wait.
+ *
+ * A pending discard of our own usually arrives while the claim result is
+ * still on screen, so an open modal is left alone - `Modal.close()` picks
+ * the freeze up as soon as that modal is dismissed. The release case
+ * covers both a teammate on another phone doing our discard for us and
+ * the team we were waiting on finally doing theirs: the wall comes down
+ * instead of sitting there over a discard that's already settled.
  */
-function syncDiscardState() {
-  const owesDiscard = State.canDiscard();
+function syncFreezeState() {
+  const frozen = State.isFrozen();
+  const isDiscarding = State.canDiscard();
 
-  // The deck is what the team would be tempted to shop around in; the
-  // map and scores are what they need to choose well, so only the panel
-  // goes away.
-  document.getElementById("cards-panel").hidden = owesDiscard;
-  document.getElementById("discard-nag").hidden = !owesDiscard;
-  document.getElementById("app").classList.toggle("app--no-deck", owesDiscard);
+  // Nothing is taken away: reading the deck is how a team decides what to
+  // throw away, and how everyone else follows what's on the table. It's
+  // the *acting* on it that's off, so the panel is only flagged frozen
+  // (see renderCardsPanel and .cards-panel--readonly) - the claim itself
+  // is refused in buildDetailView, behind the wall, and by the server.
+  document
+    .getElementById("cards-panel")
+    .classList.toggle("cards-panel--readonly", frozen);
+  document.getElementById("discard-nag").hidden = !frozen;
 
-  if (!owesDiscard) {
-    discardPeek = false;
+  if (frozen) {
+    const nagText = document.getElementById("discard-nag-text");
+    const nagButton = document.getElementById("discard-nag-btn");
+    if (isDiscarding) {
+      nagText.textContent =
+        "You need to discard a card. The board is frozen until you pick one.";
+      nagButton.textContent = "Discard a card";
+    } else {
+      nagText.textContent = `${pendingTeamLabel()} is discarding a card. The game is frozen for everyone until they pick one.`;
+      nagButton.textContent = "Back to waiting";
+    }
+  }
+
+  if (!frozen) {
+    freezePeek = false;
     if (Modal.blocking) {
       Modal.blocking = false;
       Modal.close();
@@ -186,7 +221,34 @@ function syncDiscardState() {
     return;
   }
 
-  if (!Modal.view && !discardPeek) Modal.showDiscardPick();
+  // A freeze screen already up can be the wrong side of the freeze by now
+  // - a teammate's phone paying off our discard while another team's
+  // claim froze the game again, say. Swapping it beats leaving a picker
+  // up for a discard the server would no longer accept from us.
+  const ourScreen =
+    Modal.view === "discard-pick" || Modal.view === "discard-confirm";
+  if (ourScreen && !isDiscarding) Modal.showDiscardWait();
+  else if (Modal.view === "discard-wait" && isDiscarding)
+    Modal.showDiscardPick();
+
+  if (!Modal.view && !freezePeek) showFreezeScreen();
+}
+
+/**
+ * The wall for whichever side of the freeze we're on: the picker if the
+ * discard is ours to make, the waiting screen if we're only held up by
+ * it. Every path back to a blocked board goes through here so the two
+ * can't get mixed up.
+ */
+function showFreezeScreen() {
+  if (State.canDiscard()) Modal.showDiscardPick();
+  else Modal.showDiscardWait();
+}
+
+/** Name of the team the rest of the game is waiting on. */
+function pendingTeamLabel() {
+  const pending = State.pendingDiscardTeam();
+  return pending ? pending.team_name : "Another team";
 }
 
 // ---------------------------------------------------------------------
@@ -222,6 +284,18 @@ const Modal = {
     this._open();
   },
 
+  /**
+   * The other side of a freeze: another team is discarding, so there's
+   * nothing to pick here - just the wall, and a way to check whether
+   * they're done yet.
+   */
+  showDiscardWait() {
+    this.view = "discard-wait";
+    this.context = {};
+    this.blocking = true;
+    this._open();
+  },
+
   showDiscardConfirm() {
     this.view = "discard-confirm";
     this.context.error = null;
@@ -246,10 +320,10 @@ const Modal = {
     document.getElementById("modal-overlay").hidden = true;
 
     // A claim hands out a discard while its own result modal is still
-    // up; this is where that queued discard finally gets the screen.
+    // up; this is where that queued freeze finally gets the screen.
     // Peeking is the one case where closing a modal is meant to land on
-    // the board rather than back on the discard screen.
-    if (State.canDiscard() && !discardPeek) this.showDiscardPick();
+    // the board rather than back on the freeze screen.
+    if (State.isFrozen() && !freezePeek) showFreezeScreen();
   },
 
   _open() {
@@ -265,8 +339,11 @@ const Modal = {
     const content = document.getElementById("modal-content");
     content.innerHTML = "";
     content.appendChild(this._buildView());
-    const firstFocusable = content.querySelector("button, select");
-    if (firstFocusable) firstFocusable.focus();
+    // Focus moves into the dialog so the keyboard and screen readers follow
+    // it, but it lands on the sheet rather than the first control: focusing
+    // the top card of the discard list paints a ring on it that reads as a
+    // pick the team never made.
+    document.getElementById("modal-sheet").focus();
   },
 
   _buildView() {
@@ -277,6 +354,8 @@ const Modal = {
         return buildConfirmView(this.context);
       case "discard-pick":
         return buildDiscardPickView(this.context);
+      case "discard-wait":
+        return buildDiscardWaitView();
       case "discard-confirm":
         return buildDiscardConfirmView(this.context);
       case "result":
@@ -317,11 +396,14 @@ function buildDetailView(context) {
 
   // Peeking at the board with a discard outstanding: the card is still
   // worth reading, but the server would reject a claim anyway, so the
-  // whole claim block stays out rather than failing on tap.
-  if (card.card_state !== "Claimed" && State.canDiscard()) {
+  // whole claim block stays out rather than failing on tap. Someone
+  // else's outstanding discard blocks us exactly as hard as our own.
+  if (card.card_state !== "Claimed" && State.isFrozen()) {
     const note = document.createElement("p");
     note.className = "modal-tag";
-    note.textContent = "Discard a card first to claim anything else.";
+    note.textContent = State.canDiscard()
+      ? "Discard a card first to claim anything else."
+      : `Waiting for ${pendingTeamLabel()} to discard a card.`;
     wrap.appendChild(note);
     return wrap;
   }
@@ -430,6 +512,15 @@ async function performClaim(card, targetName, triggerBtn) {
     await window.refreshAll();
     Modal.showResult("claim", newCards);
   } catch (err) {
+    // A claim the server refuses because a discard is outstanding means
+    // our board simply hadn't heard about the freeze yet - the error to
+    // show for that is the wall itself, not a line of red text under a
+    // confirm button that can't work.
+    await window.refreshAll();
+    if (State.isFrozen()) {
+      showFreezeScreen();
+      return;
+    }
     Modal.context.error = err.message;
     Modal.showConfirm();
   }
@@ -441,9 +532,24 @@ function buildDiscardPickView(context) {
   wrap.className = "discard-screen";
   const publicCards = State.publicBoardCards();
 
+  // The other teams get a say in what leaves the board, and this is the
+  // screen with time to ask them - by the confirm step a thumb is already
+  // on its way to "Yes, discard". Loud enough to stop that thumb: a pick
+  // nobody cleared is the mistake this screen exists to prevent. Only
+  // worth saying when there's actually something to pick, hence the
+  // length check rather than a flat line.
+  const vetoReminder =
+    publicCards.length > 0
+      ? `<p class="discard-screen__reminder">
+           <strong>Reminder:</strong> the other teams can veto your pick.
+           Check with them before you discard.
+         </p>`
+      : "";
+
   wrap.innerHTML = `
     <p class="discard-screen__eyebrow">Before you play</p>
     <h2 class="discard-screen__title">Discard a card</h2>
+    ${vetoReminder}
     ${error ? `<p class="modal-error">${escapeHtml(error)}</p>` : ""}
   `;
 
@@ -518,6 +624,52 @@ function buildPeekButton() {
   return peekBtn;
 }
 
+/**
+ * The freeze screen for everyone who isn't the one discarding. It can't
+ * offer the picker - the server only takes a discard from the team that
+ * is discarding - so all it can do is name who's holding the game up and let
+ * the board be checked again. There's no polling anywhere in this app, so
+ * that check is a button: the freeze lifts on the refresh that first sees
+ * the discard land.
+ */
+function buildDiscardWaitView() {
+  const wrap = document.createElement("div");
+  wrap.className = "discard-screen discard-screen--centered";
+  const pending = escapeHtml(pendingTeamLabel());
+
+  wrap.innerHTML = `
+    <p class="discard-screen__eyebrow">Game frozen</p>
+    <h2 class="discard-screen__title">${pending} is discarding</h2>
+    <p class="modal-description">
+      ${pending} completed a challenge and is discarding a card.
+      The game is frozen until they picked one.
+    </p>
+  `;
+
+  const actions = document.createElement("div");
+  actions.className = "modal-actions";
+
+  const checkBtn = document.createElement("button");
+  checkBtn.type = "button";
+  checkBtn.className = "btn btn--primary";
+  checkBtn.textContent = "Check again";
+  checkBtn.addEventListener("click", async () => {
+    checkBtn.disabled = true;
+    checkBtn.textContent = "Checking...";
+    await window.refreshAll();
+    // Either the discard landed and the refresh already took this screen
+    // down, or it didn't and the button has to come back to life. A
+    // rebuild also picks up a different team having taken over the
+    // freeze in the meantime.
+    if (Modal.view === "discard-wait") Modal.showDiscardWait();
+  });
+
+  actions.appendChild(buildPeekButton());
+  actions.appendChild(checkBtn);
+  wrap.appendChild(actions);
+  return wrap;
+}
+
 function buildDiscardConfirmView(context) {
   const { selected, error } = context;
   const wrap = document.createElement("div");
@@ -561,7 +713,7 @@ async function performDiscard(card, triggerBtn) {
       State.myTeamColor,
       card.card_id,
     );
-    // The debt is paid server-side; clear it locally too, so a refresh
+    // The discard is done server-side; clear it locally too, so a refresh
     // that fails right after can't leave the blocking screen stuck up.
     const team = State.myTeam();
     if (team) team.can_discard_card = false;

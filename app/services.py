@@ -120,6 +120,21 @@ def get_team_or_raise(session: Session, game_id: str, team_color: TeamColor) -> 
     return team
 
 
+def get_pending_discard_team(session: Session, game_id: str) -> Optional[Team]:
+    """
+    The team that is discarding, or None if nobody does.
+
+    A mandatory discard freezes the whole game, not just the team that
+    is discarding: while a card is waiting to be thrown away, no team may
+    claim. That makes "is a discard pending?" a question about the game
+    rather than about one team, which is why this looks at every team in
+    it. At most one team can be discarding at a time, since the claim
+    that hands a discard out is itself blocked while one is in progress.
+    """
+    statement = select(Team).where(Team.game_id == game_id, Team.can_discard_card)
+    return session.exec(statement).first()
+
+
 def list_teams(session: Session, game_id: str) -> List[Team]:
     """All teams registered for a game, e.g. for a score bar or lobby view."""
     teams = session.exec(select(Team).where(Team.game_id == game_id)).all()
@@ -282,8 +297,16 @@ def claim_card(
     team = get_team_or_raise(session, game_id, team_color)
     card = get_card_or_raise(session, game_id, card_id)
     
-    if team.can_discard_card:
-        raise InvalidActionError(f"Team {team_color.value} has to discard a card first!")
+    # Claims are frozen for everyone while a discard is outstanding, so
+    # this looks at the whole game and not just at `team`.
+    pending_team = get_pending_discard_team(session, game_id)
+    if pending_team is not None:
+        if pending_team.team_color == team_color:
+            raise InvalidActionError(f"Team {team_color.value} has to discard a card first!")
+        else:
+            raise InvalidActionError(
+                f"The game is frozen until team {pending_team.team_color.value} discards a card!"
+            )
 
     if not card_visible_to_team(card, team_color):
         raise CardNotVisibleError(f"Card {card_id} is not visible to team '{team_color.value}'.")
