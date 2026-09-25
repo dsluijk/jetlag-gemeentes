@@ -369,24 +369,51 @@ const Modal = {
 function buildDetailView(context) {
   const { card, error } = context;
   const wrap = document.createElement("div");
+  wrap.className = card.is_wild_card
+    ? "card-detail card-detail--wild"
+    : "card-detail";
+
+  const badge = card.is_wild_card
+    ? ' <span class="modal-badge">Wild card</span>'
+    : "";
+
+  // The challenge title is the line a team is actually here to read, so it
+  // takes the heading and the gemeente steps down to a kicker above it.
+  // Plenty of cards have no title yet; there the gemeente keeps the
+  // heading, and the rule and text panel below carry the layout instead.
+  // Both stay inside the one <h2> so the heading still reads as
+  // "<gemeente>, <challenge>" to a screen reader.
+  const kicker = card.challenge_title
+    ? `<span class="card-detail__kicker">${escapeHtml(card.card_name)}${badge}</span>`
+    : "";
+  const headline = card.challenge_title
+    ? escapeHtml(card.challenge_title)
+    : `${escapeHtml(card.card_name)}${badge}`;
 
   const claimedTag =
     card.card_state === "Claimed"
-      ? `<p class="modal-tag">Claimed by ${escapeHtml(teamName(card.claimed_team))}</p>`
+      ? `<p class="card-detail__claimed"><span class="card-detail__claimed-dot" style="background:${
+          CONFIG.TEAM_COLORS[card.claimed_team] || "#999"
+        }"></span>Claimed by ${escapeHtml(teamName(card.claimed_team))}</p>`
       : "";
 
   wrap.innerHTML = `
     <div class="modal-header">
-      <h2>${escapeHtml(card.card_name)}${card.is_wild_card ? ' <span class="modal-badge">Wild card</span>' : ""}</h2>
+      <h2 class="card-detail__title">${kicker}${headline}</h2>
       <button type="button" class="modal-close" aria-label="Close">&times;</button>
     </div>
+    <span class="card-detail__rule" aria-hidden="true"></span>
     ${claimedTag}
-    ${card.challenge_title ? `<p class="modal-challenge-title">${escapeHtml(card.challenge_title)}</p>` : ""}
-    <p class="modal-description">${
+    ${
       card.challenge_description
-        ? escapeHtml(card.challenge_description)
-        : "No challenge text has been added for this card yet."
-    }</p>
+        ? `<p class="card-detail__body">${escapeHtml(card.challenge_description)}</p>`
+        : `<p class="card-detail__body card-detail__body--empty">No challenge text has been added for this card yet.</p>`
+    }
+    ${
+      card.challenge_link
+        ? `<p class="modal-link"><a href="${escapeHtml(card.challenge_link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(card.challenge_link)}</a></p>`
+        : ""
+    }
     ${error ? `<p class="modal-error">${escapeHtml(error)}</p>` : ""}
   `;
 
