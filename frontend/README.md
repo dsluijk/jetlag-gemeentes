@@ -1,4 +1,4 @@
-# Gemeentejacht - Jetlag game frontend
+# JetLag: Gemeente Gathering
 
 Mobile-first web frontend for the jetlag-api backend: a MapLibre map of
 gemeente boundaries, a cards panel, a score bar, and the claim/discard

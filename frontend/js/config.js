@@ -107,7 +107,7 @@ function getMyTeamColor() {
 // possible. Shared because the create page writes the entry too: after
 // creating a game it sends you to the join page, which should already
 // have that game selected.
-const LAST_JOIN_KEY = "gemeentejacht:last-join";
+const LAST_JOIN_KEY = "gemeentegathering:last-join";
 
 /** Storage throws in Safari private mode, so both helpers are best-effort. */
 function readRemembered() {

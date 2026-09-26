@@ -1,6 +1,10 @@
-# Jetlag Game API
+# JetLag: Gemeente Gathering
 
-REST API backing our version of the Jetlag "Hide and Seek" card game.
+Web app (REST API + vanilla JS front-end) for playing our own version of 'JetLag: The Game'
+with the municipalities of Overijssel and Gelderland.
+
+Disclaimer: This project has been primarily vibe coded using a combination of LLMs. The scope
+of the project is limited to a group of friends playing a game.
 
 ## Stack
 
