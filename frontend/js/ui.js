@@ -67,7 +67,7 @@ const UI = {
   openCardModal(name) {
     const card = State.cardByName(name);
     if (!card) {
-      UI.toast("That gemeente hasn't been revealed yet.");
+      UI.toast(`Could not find ${card} in cards supplied by API!`);
       return;
     }
     Modal.showCardDetail(card);
@@ -456,7 +456,7 @@ function buildDetailView(context) {
     return wrap;
   }
 
-  if (card.card_state !== "Claimed") {
+  if (card.card_state === "OnPublicBoard" || card.card_state === "OnPrivateBoard") {
     const actions = document.createElement("div");
     actions.className = "modal-actions";
 
