@@ -70,14 +70,14 @@ const CONFIG = {
   MAP_FILL: {
     background: "#EEEEEE", // if no BASEMAP is configured
     hidden: "#FFFFFF", // not on the public or private board (to us)
-    hiddenOpacity: 0.8,
+    hiddenOpacity: 0.5,
     public: "#93c4d4",
-    publicOpacity: 0.32,
-    privateOpacity: 0.32,
+    publicOpacity: 0.5,
+    privateOpacity: 0.5,
     claimedOpacity: 0.8,
-    strokeColor: "#8A8672",
-    strokeWidth: 2.5,
-    claimedStrokeWidth: 4,
+    strokeColor: "#615f57",
+    strokeWidth: 1.5,
+    claimedStrokeWidth: 1.5,
 
     // Hovering a gemeente (tapping it, on touch) outlines it and
     // highlights everything it borders (see MapView._setHighlighted).
@@ -86,10 +86,10 @@ const CONFIG = {
     hoverColor: "#22211C", // same ink as its outline, so the two read as one shape
     hoverOpacity: 0.8,
     hoverStrokeColor: "#22211C",
-    hoverStrokeWidth: 4,
+    hoverStrokeWidth: 1.5,
     neighbourColor: "#22211C",
     neighbourOpacity: 0.28,
-    neighbourStrokeWidth: 3.5,
+    neighbourStrokeWidth: 1.5,
   },
 };
 

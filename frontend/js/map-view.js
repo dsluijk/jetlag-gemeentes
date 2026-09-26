@@ -411,10 +411,10 @@ const MapView = {
       const color = CONFIG.TEAM_COLORS[card.claimed_team] || "#999999";
       return {
         fillColor: color,
-        fillOpacity: fill.claimedOpacity * (isScoring ? 1 : 0.8),
+        fillOpacity: fill.claimedOpacity,
         strokeColor: color,
         strokeOpacity: 1,
-        strokeWidth: isScoring ? fill.claimedStrokeWidth : fill.strokeWidth,
+        strokeWidth: fill.claimedStrokeWidth,
       };
     }
 
