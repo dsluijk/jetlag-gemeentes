@@ -17,6 +17,8 @@ const MapView = {
   loaded: false,
   onGemeenteClick: null,
   highlightedName: null,
+  baseMapOpacity: CONFIG.BASEMAP_OPACITY,
+  _basemapOpacityControl: null,
   _pendingStyleUpdate: false,
   _lastPointerType: null,
   _touchStart: null,
@@ -31,10 +33,11 @@ const MapView = {
   init(mapDiv, geojson, onGemeenteClick) {
     this.geojson = geojson;
     this.onGemeenteClick = onGemeenteClick;
+    this.baseMapOpacity = CONFIG.BASEMAP_OPACITY;  // load default basemap_opacity from config
 
     this.map = new maplibregl.Map({
       container: mapDiv,
-      style: buildBaseStyle(),
+      style: buildBaseStyle(this.baseMapOpacity),
       center: CONFIG.MAP_CENTER,
       zoom: CONFIG.MAP_ZOOM,
       attributionControl: CONFIG.SHOW_BASEMAP, // only needed when we're actually using OSM tiles
@@ -44,6 +47,13 @@ const MapView = {
       new maplibregl.NavigationControl({ showCompass: false }),
       "top-right",
     );
+
+    if (CONFIG.SHOW_BASEMAP) {
+      this._basemapOpacityControl = createBasemapOpacityControl(
+        (opacity) => this.setBaseMapOpacity(opacity),
+      );
+      this.map.addControl(this._basemapOpacityControl, "top-right");
+    }
 
     this.map.on("load", () => {
       const fill = CONFIG.MAP_FILL;
@@ -281,6 +291,7 @@ const MapView = {
       if (bounds) this.map.fitBounds(bounds, { padding: 24, duration: 0 });
 
       this.loaded = true;
+      this._applyBaseMapOpacity();
       if (this._pendingStyleUpdate) {
         this._pendingStyleUpdate = false;
         this.applyStyles();
@@ -315,6 +326,19 @@ const MapView = {
     clearTimeout(this._longPressTimer);
     this._longPressTimer = null;
     this._touchStart = null;
+  },
+
+  /** Apply the current basemap opacity to the raster layer, if it exists. */
+  _applyBaseMapOpacity() {
+    if (!this.loaded) return;
+    if (!this.map.getLayer(BASEMAP_LAYER_ID)) return;
+    this.map.setPaintProperty(BASEMAP_LAYER_ID, "raster-opacity", this.baseMapOpacity);
+  },
+
+  /** Set the basemap opacity and keep the control state in sync. */
+  setBaseMapOpacity(opacity) {
+    this.baseMapOpacity = opacity;
+    this._applyBaseMapOpacity();
   },
 
   /**
@@ -437,12 +461,62 @@ const LONG_PRESS_MS = 350;
 /** How far (px) a finger may drift during that and still count as held rather than panning. */
 const LONG_PRESS_MOVE_TOLERANCE = 10;
 
+/** The raster layer id used for the OpenStreetMap basemap. */
+const BASEMAP_LAYER_ID = "osm";
+
+/** Compact +/- control that adjusts the basemap raster opacity. */
+function createBasemapOpacityControl(setOpacity) {
+  let container = null;
+  let toggleButton = null;
+  let opacityInput = null;
+
+  return {
+    onAdd() {
+      container = document.createElement("div");
+      container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+
+      toggleButton = document.createElement("button");
+      toggleButton.className = "maplibregl-ctrl-basemap-opacity";
+      toggleButton.type = "button";
+      toggleButton.addEventListener("click", () => {
+        opacityInput.style.display = opacityInput.style.display === "none" ? "block" : "none";
+      });
+
+      toggleButtonIcon = document.createElement("span");
+      toggleButtonIcon.className = "maplibregl-ctrl-icon";
+      toggleButton.append(toggleButtonIcon)
+
+      opacityInput = document.createElement("input");
+      opacityInput.type = "range";
+      opacityInput.min = "0";
+      opacityInput.max = "1";
+      opacityInput.step = "0.01";
+      opacityInput.value = CONFIG.BASEMAP_OPACITY;
+      opacityInput.style.display = "none";
+      opacityInput.addEventListener("input", (event) => {
+        const opacity = Number(event.target.value);
+        setOpacity(opacity)
+      });
+
+      container.append(toggleButton, opacityInput);
+      return container;
+    },
+
+    onRemove() {
+      container?.remove();
+      container = null;
+      toggleButton = null;
+      opacityInput = null;
+    },
+  };
+}
+
 /**
  * Builds the MapLibre style JSON for the base map, honoring
  * CONFIG.SHOW_BASEMAP. When it's off, no tiles are requested at all -
  * just a flat background color behind the gemeente polygons.
  */
-function buildBaseStyle() {
+function buildBaseStyle(baseMapOpacity = CONFIG.BASEMAP_OPACITY) {
   const style = CONFIG.SHOW_BASEMAP
     ? // Plain OpenStreetMap raster tiles - free, no API key required. Swap
       // this for a vector style (e.g. from MapTiler/Stadia/etc., which do
@@ -458,7 +532,16 @@ function buildBaseStyle() {
             attribution: "&copy; OpenStreetMap contributors",
           },
         },
-        layers: [{ id: "osm", type: "raster", source: "osm" }],
+        layers: [
+          {
+            id: BASEMAP_LAYER_ID,
+            type: "raster",
+            source: BASEMAP_LAYER_ID,
+            paint: {
+              "raster-opacity": baseMapOpacity,
+            },
+          },
+        ],
       }
     : {
         version: 8,

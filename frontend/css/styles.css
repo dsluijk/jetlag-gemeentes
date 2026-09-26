@@ -256,6 +256,10 @@ button {
   height: 100%;
 }
 
+.maplibregl-ctrl button.maplibregl-ctrl-basemap-opacity .maplibregl-ctrl-icon {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' fill='%23333' viewBox='0 0 24 24'%3E%3Cpath d='M3.5 6.5 8 4l8 2.5L20.5 4v11.5L16 18l-8-2.5-4.5 2.5Z'/%3E%3Cpath d='M3.5 10.5 8 8l8 2.5 4.5-2.5'/%3E%3C/svg%3E");
+}
+
 /* ------------------------------------------------------------------ */
 /* Cards panel (bottom sheet on mobile)                                 */
 /* ------------------------------------------------------------------ */

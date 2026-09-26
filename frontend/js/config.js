@@ -30,6 +30,9 @@ const CONFIG = {
   // focus on the polygons, or want to swap in your own basemap later.
   SHOW_BASEMAP: true,
 
+  // Initial opacity for the basemap tiles when SHOW_BASEMAP is on.
+  BASEMAP_OPACITY: 0.4,
+
   // MapLibre uses [lng, lat] order (opposite of some other map APIs).
   // Roughly centers on the eastern Netherlands; adjust to taste.
   MAP_CENTER: [6.15, 52.25],
