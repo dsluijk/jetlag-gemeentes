@@ -207,7 +207,7 @@ async function submit() {
   // just created already selected. Deliberately not skipping it: the
   // organiser still has to say which team they're on.
   writeRemembered(gameId, rows[0].color);
-  window.location.href = "/";
+  window.location.href = "index.html";
 }
 
 // ---------------------------------------------------------------------
