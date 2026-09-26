@@ -467,24 +467,31 @@ const BASEMAP_LAYER_ID = "osm";
 /** Compact +/- control that adjusts the basemap raster opacity. */
 function createBasemapOpacityControl(setOpacity) {
   let container = null;
-  let toggleButton = null;
-  let opacityInput = null;
+  let toggleGroup = null;
+  let opacityGroup = null;
 
   return {
     onAdd() {
       container = document.createElement("div");
-      container.className = "maplibregl-ctrl maplibregl-ctrl-group";
+
+      toggleGroup = document.createElement("div");
+      toggleGroup.className = "maplibregl-ctrl maplibregl-ctrl-group";
 
       toggleButton = document.createElement("button");
       toggleButton.className = "maplibregl-ctrl-basemap-opacity";
       toggleButton.type = "button";
       toggleButton.addEventListener("click", () => {
-        opacityInput.style.display = opacityInput.style.display === "none" ? "block" : "none";
+        opacityGroup.style.display = opacityGroup.style.display === "none" ? "block" : "none";
       });
+      toggleGroup.append(toggleButton)
 
       toggleButtonIcon = document.createElement("span");
       toggleButtonIcon.className = "maplibregl-ctrl-icon";
       toggleButton.append(toggleButtonIcon)
+
+      opacityGroup = document.createElement("div")
+      opacityGroup.className = "maplibregl-ctrl maplibregl-ctrl-group";
+      opacityGroup.style.display = "none";
 
       opacityInput = document.createElement("input");
       opacityInput.type = "range";
@@ -492,13 +499,13 @@ function createBasemapOpacityControl(setOpacity) {
       opacityInput.max = "1";
       opacityInput.step = "0.01";
       opacityInput.value = CONFIG.BASEMAP_OPACITY;
-      opacityInput.style.display = "none";
       opacityInput.addEventListener("input", (event) => {
         const opacity = Number(event.target.value);
         setOpacity(opacity)
       });
+      opacityGroup.append(opacityInput)
 
-      container.append(toggleButton, opacityInput);
+      container.append(toggleGroup, opacityGroup);
       return container;
     },
 
