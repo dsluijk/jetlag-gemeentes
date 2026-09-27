@@ -65,12 +65,7 @@ const UI = {
   },
 
   openCardModal(name) {
-    const card = State.cardByName(name);
-    if (!card) {
-      UI.toast(`Could not find ${card} in cards supplied by API!`);
-      return;
-    }
-    Modal.showCardDetail(card);
+    Modal.showGemeente(name);
   },
 
   /** Leave the freeze screen for the frozen board behind it. */
@@ -160,7 +155,15 @@ function renderCardsPanel() {
     if (shapeUrl) {
       button.style.setProperty("--shape", `url("${shapeUrl}")`);
     }
-    button.addEventListener("click", () => Modal.showCardDetail(card));
+    // A gemeente opens the same panel a tap on the map does, so the one
+    // place that answers "what can I do with this gemeente" doesn't depend
+    // on where you tapped it. A wild card has no gemeente to open, so it
+    // opens itself and picks a target from a list.
+    button.addEventListener("click", () =>
+      card.is_wild_card
+        ? Modal.showCardDetail(card)
+        : Modal.showGemeente(card.card_name),
+    );
     list.appendChild(button);
   }
 }
@@ -288,8 +291,25 @@ const Modal = {
 
   showCardDetail(card) {
     this.view = "detail";
-    this.context = { card, targetName: null, error: null };
+    this.context = { card, targetName: null, error: null, returnTo: null };
     this._open();
+  },
+
+  /**
+   * The panel for one gemeente: its own challenge, plus every wild card
+   * that can be played on it. Same view as showCardDetail - a gemeente
+   * card *is* what that view shows - named separately because the map and
+   * the deck have a name to open rather than a card in hand.
+   */
+  showGemeente(name) {
+    const card = State.cardByName(name);
+    if (!card) {
+      // Every gemeente in the KML is a card in the deck, so this only
+      // happens if the two ever drift apart.
+      UI.toast(`${name} isn't in the deck the server sent.`, "error");
+      return;
+    }
+    this.showCardDetail(card);
   },
 
   showConfirm() {
@@ -411,20 +431,13 @@ function buildDetailView(context) {
     ? escapeHtml(card.challenge_title)
     : `${escapeHtml(card.card_name)}${badge}`;
 
-  const claimedTag =
-    card.card_state === "Claimed"
-      ? `<p class="card-detail__claimed"><span class="card-detail__claimed-dot" style="background:${
-          CONFIG.TEAM_COLORS[card.claimed_team] || "#999"
-        }"></span>Claimed by ${escapeHtml(teamName(card.claimed_team))}</p>`
-      : "";
-
   wrap.innerHTML = `
     <div class="modal-header">
       <h2 class="card-detail__title">${kicker}${headline}</h2>
       <button type="button" class="modal-close" aria-label="Close">&times;</button>
     </div>
     <span class="card-detail__rule" aria-hidden="true"></span>
-    ${claimedTag}
+    ${statusPillHtml(card)}
     ${
       card.challenge_description
         ? `<p class="card-detail__body">${escapeHtml(card.challenge_description)}</p>`
@@ -443,64 +456,246 @@ function buildDetailView(context) {
     .addEventListener("click", () => Modal.close());
 
   // Peeking at the board with a discard outstanding: the card is still
-  // worth reading, but the server would reject a claim anyway, so the
-  // whole claim block stays out rather than failing on tap. Someone
-  // else's outstanding discard blocks us exactly as hard as our own.
-  if (card.card_state !== "Claimed" && State.isFrozen()) {
+  // worth reading, but the server would reject a claim anyway, so every
+  // claim button stays out rather than failing on tap - the wild cards
+  // below included. Someone else's outstanding discard blocks us exactly
+  // as hard as our own.
+  const frozen = State.isFrozen();
+  if (card.card_state !== "Claimed" && frozen) {
     const note = document.createElement("p");
     note.className = "modal-tag";
     note.textContent = State.canDiscard()
       ? "Discard a card first to claim anything else."
       : `Waiting for ${pendingTeamLabel()} to discard a card.`;
     wrap.appendChild(note);
-    return wrap;
+  } else if (
+    card.card_state === "OnPublicBoard" ||
+    card.card_state === "OnPrivateBoard"
+  ) {
+    appendClaimBlock(wrap, context);
   }
 
-  if (card.card_state === "OnPublicBoard" || card.card_state === "OnPrivateBoard") {
-    const actions = document.createElement("div");
-    actions.className = "modal-actions";
-
-    let targetSelect = null;
-    if (card.is_wild_card) {
-      const field = document.createElement("div");
-      field.className = "modal-field";
-      const label = document.createElement("label");
-      label.textContent = "Claim which gemeente with this wild card?";
-      label.htmlFor = "wildcard-target";
-      targetSelect = document.createElement("select");
-      targetSelect.id = "wildcard-target";
-      targetSelect.innerHTML =
-        `<option value="">Choose a gemeente...</option>` +
-        State.unclaimedGemeentes()
-          .map(
-            (name) =>
-              `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`,
-          )
-          .join("");
-      field.appendChild(label);
-      field.appendChild(targetSelect);
-      wrap.appendChild(field);
-    }
-
-    const completeBtn = document.createElement("button");
-    completeBtn.type = "button";
-    completeBtn.className = "btn btn--primary";
-    completeBtn.textContent = "Challenge complete!";
-    completeBtn.disabled = card.is_wild_card; // needs a target picked first
-
-    if (targetSelect) {
-      targetSelect.addEventListener("change", () => {
-        context.targetName = targetSelect.value || null;
-        completeBtn.disabled = !context.targetName;
-      });
-    }
-
-    completeBtn.addEventListener("click", () => Modal.showConfirm());
-    actions.appendChild(completeBtn);
-    wrap.appendChild(actions);
+  // A gemeente's own challenge is only one way to take it: any wild card
+  // that applies here is another, and which of them are in play is the
+  // thing you came to the map to find out.
+  if (!card.is_wild_card) {
+    const wilds = buildWildcardSection(card.card_name, {
+      playable: !frozen && card.card_state !== "Claimed",
+    });
+    if (wilds) wrap.appendChild(wilds);
   }
 
   return wrap;
+}
+
+/**
+ * Where a card stands on the board, as a pill under its title: on the
+ * public board, on ours, claimed, or nowhere yet. The whole point of the
+ * panel listing cards you *can't* play is that it says so about each one,
+ * so this is never left off.
+ *
+ * "Not on the board" covers a card in the deck and one on another team's
+ * private board alike - the server hands both to us as InDeck, and from
+ * here they amount to the same thing: not yours to claim yet.
+ */
+function statusPillHtml(card, extraClass = "") {
+  const classes = (modifier) =>
+    `card-detail__status card-detail__status--${modifier}${extraClass ? ` ${extraClass}` : ""}`;
+
+  if (card.card_state === "Claimed") {
+    const color = CONFIG.TEAM_COLORS[card.claimed_team] || "#999";
+    return `<span class="${classes("claimed")}"><span class="card-detail__status-dot" style="background:${color}"></span>Claimed by ${escapeHtml(teamName(card.claimed_team))}</span>`;
+  }
+  if (card.card_state === "OnPublicBoard") {
+    return `<span class="${classes("board")}">On the public board</span>`;
+  }
+  if (
+    card.card_state === "OnPrivateBoard" &&
+    card.private_board_team === State.myTeamColor
+  ) {
+    return `<span class="${classes("board")}">On your private board</span>`;
+  }
+  return `<span class="${classes("off")}">Not on the board</span>`;
+}
+
+/**
+ * Adds the "Challenge complete!" button for `context.card`, and for a wild
+ * card the gemeente picker it needs first.
+ *
+ * That picker only offers the gemeentes the wild card actually applies to
+ * - a Burger King card is no use where there's no Burger King, and the
+ * server refuses it anyway. Opening a wild card from the deck is the one
+ * route that needs it: come in from the map and the gemeente is already
+ * settled by which one you tapped.
+ */
+function appendClaimBlock(wrap, context) {
+  const { card } = context;
+
+  let targetSelect = null;
+  if (card.is_wild_card) {
+    const targets = State.wildcardTargets(card.card_name);
+    if (targets.length === 0) {
+      const note = document.createElement("p");
+      note.className = "modal-tag";
+      note.textContent = State.wildcardScopeLoaded(card.card_name)
+        ? "Every gemeente this wild card applies to has been claimed already."
+        : "Couldn't load the gemeentes this wild card applies to. Try refreshing.";
+      wrap.appendChild(note);
+      return;
+    }
+
+    const field = document.createElement("div");
+    field.className = "modal-field";
+    const label = document.createElement("label");
+    label.textContent = "Claim which gemeente with this wild card?";
+    label.htmlFor = "wildcard-target";
+    targetSelect = document.createElement("select");
+    targetSelect.id = "wildcard-target";
+    targetSelect.innerHTML =
+      `<option value="">Choose a gemeente...</option>` +
+      targets
+        .map(
+          (name) =>
+            `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`,
+        )
+        .join("");
+    const hint = document.createElement("p");
+    hint.className = "modal-field__hint";
+    hint.textContent = `Only the ${targets.length} unclaimed ${
+      targets.length === 1 ? "gemeente" : "gemeentes"
+    } this card applies to.`;
+    field.appendChild(label);
+    field.appendChild(targetSelect);
+    field.appendChild(hint);
+    wrap.appendChild(field);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "modal-actions";
+
+  const completeBtn = document.createElement("button");
+  completeBtn.type = "button";
+  completeBtn.className = "btn btn--primary";
+  completeBtn.textContent = "Challenge complete!";
+  completeBtn.disabled = card.is_wild_card; // needs a target picked first
+
+  if (targetSelect) {
+    targetSelect.addEventListener("change", () => {
+      context.targetName = targetSelect.value || null;
+      completeBtn.disabled = !context.targetName;
+    });
+  }
+
+  completeBtn.addEventListener("click", () => Modal.showConfirm());
+  actions.appendChild(completeBtn);
+  wrap.appendChild(actions);
+}
+
+/**
+ * The wild cards that can be played on `gemeenteName`, listed under its
+ * own challenge. Returns null when none apply, which is most gemeentes.
+ *
+ * Only the ones actually on a board are listed outright - those are the
+ * ones you can do something about. The rest still apply here, and knowing
+ * that "this is a Burger King gemeente" is worth something before the card
+ * turns up, but they'd bury the two lines that matter if they sat at the
+ * same level. So they go behind one fold, which most gemeentes leave
+ * closed.
+ *
+ * `playable` is false when a claim couldn't go through anyway - the game
+ * is frozen, or this gemeente is already taken - and then no entry gets a
+ * button, however well placed the card is.
+ */
+function buildWildcardSection(gemeenteName, { playable }) {
+  const wildcards = State.wildcardsFor(gemeenteName);
+  if (wildcards.length === 0) return null;
+
+  const section = document.createElement("section");
+  section.className = "card-detail__wilds";
+  section.innerHTML = `
+    <h3 class="card-detail__wilds-title">Wild cards for ${escapeHtml(gemeenteName)}</h3>
+  `;
+
+  const inPlay = wildcards.filter((c) => State.isOnBoardForMe(c));
+  const rest = wildcards.filter((c) => !State.isOnBoardForMe(c));
+
+  for (const wildcard of inPlay) {
+    section.appendChild(buildWildcardEntry(wildcard, gemeenteName, playable));
+  }
+
+  if (rest.length > 0) {
+    const more = document.createElement("details");
+    more.className = "wild-more";
+    const one = rest.length === 1;
+    // "more" only when something is listed above it to be more than.
+    const count = `${rest.length}${inPlay.length > 0 ? " more" : ""}`;
+    more.innerHTML = `
+      <summary class="wild-more__summary">
+        <span>${count} wild card${one ? "" : "s"} ${
+          one ? "applies" : "apply"
+        } here</span>
+        <span class="wild-entry__chevron" aria-hidden="true"></span>
+      </summary>
+    `;
+    for (const wildcard of rest) {
+      more.appendChild(buildWildcardEntry(wildcard, gemeenteName, playable));
+    }
+    section.appendChild(more);
+  }
+
+  return section;
+}
+
+/**
+ * One wild card in that list: name and board status on the row, the
+ * challenge text behind a <details> because these descriptions run long
+ * and the list is there to be scanned first. A real element rather than a
+ * hand-rolled toggle, so it keeps its keyboard handling for free.
+ */
+function buildWildcardEntry(wildcard, gemeenteName, playable) {
+  const entry = document.createElement("details");
+  entry.className = "wild-entry";
+  entry.innerHTML = `
+    <summary class="wild-entry__summary">
+      <span class="wild-entry__name">${escapeHtml(wildcard.card_name)}</span>
+      ${statusPillHtml(wildcard, "wild-entry__status")}
+      <span class="wild-entry__chevron" aria-hidden="true"></span>
+    </summary>
+    ${
+      wildcard.challenge_description
+        ? `<p class="card-detail__body">${escapeHtml(wildcard.challenge_description)}</p>`
+        : `<p class="card-detail__body card-detail__body--empty">No challenge text has been added for this card yet.</p>`
+    }
+    ${
+      wildcard.challenge_link
+        ? `<p class="modal-link"><a href="${escapeHtml(wildcard.challenge_link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(wildcard.challenge_link)}</a></p>`
+        : ""
+    }
+  `;
+
+  if (playable && State.isOnBoardForMe(wildcard)) {
+    const actions = document.createElement("div");
+    actions.className = "modal-actions";
+
+    const useBtn = document.createElement("button");
+    useBtn.type = "button";
+    useBtn.className = "btn btn--primary";
+    useBtn.textContent = "Use this wild card here";
+    useBtn.addEventListener("click", () => {
+      // No picker to fill in: the gemeente is the panel we're standing
+      // in. `returnTo` is how Cancel gets back here rather than landing
+      // on the wild card's own view, which isn't where we came from.
+      Modal.context.card = wildcard;
+      Modal.context.targetName = gemeenteName;
+      Modal.context.returnTo = gemeenteName;
+      Modal.showConfirm();
+    });
+
+    actions.appendChild(useBtn);
+    entry.appendChild(actions);
+  }
+
+  return entry;
 }
 
 function buildConfirmView(context) {
@@ -530,7 +725,11 @@ function buildConfirmView(context) {
   cancelBtn.type = "button";
   cancelBtn.className = "btn btn--ghost";
   cancelBtn.textContent = "Cancel";
-  cancelBtn.addEventListener("click", () => Modal.showCardDetail(card));
+  cancelBtn.addEventListener("click", () =>
+    context.returnTo
+      ? Modal.showGemeente(context.returnTo)
+      : Modal.showCardDetail(card),
+  );
 
   const confirmBtn = document.createElement("button");
   confirmBtn.type = "button";

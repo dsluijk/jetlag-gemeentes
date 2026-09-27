@@ -22,6 +22,11 @@ const Api = {
     return request("pairs");
   },
 
+  /** Wild card name -> the gemeentes it may be played on. */
+  getWildcardGemeentes() {
+    return request("wildcards");
+  },
+
   getTeams(gameId) {
     return request(`${gameId}/teams`);
   },

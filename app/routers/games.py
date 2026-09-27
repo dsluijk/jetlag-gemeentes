@@ -134,7 +134,8 @@ def claim_card_endpoint(
         default=None,
         description=(
             "Required if and only if `card_id` is a wild card: the ID of the "
-            "gemeente card being claimed with it."
+            "gemeente card being claimed with it. Must be one of the gemeentes "
+            "that wild card applies to - see `GET /wildcards`."
         ),
     ),
     session: Session = Depends(get_session),

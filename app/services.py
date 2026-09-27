@@ -13,7 +13,7 @@ from sqlalchemy.orm.session import make_transient
 from sqlmodel import Session, select
 
 from app.challenges import CHALLENGES
-from app.game_data import EMPTY_CHALLENGE, GEMEENTES, WILD_CARDS
+from app.game_data import EMPTY_CHALLENGE, GEMEENTES, WILD_CARDS, gemeentes_for_wild_card
 from app.models import Card, CardState, Team, TeamColor
 from app.schemas import GameSummary, TeamCreate
 
@@ -366,6 +366,10 @@ def claim_card(
     """
     Claim `card_id` for `team_color`.
 
+    A wild card needs `target_card_id`: the gemeente card it is being
+    played on, which has to be one of the gemeentes that wild card applies
+    to (see WILD_CARDS in app/game_data.py).
+
     Returns the list of newly-drawn cards that replenished the public
     board - 0, 1, or 2 of them:
       - a non-wild claim frees at most 1 slot (the claimed card itself,
@@ -409,9 +413,11 @@ def claim_card(
         session.flush()
 
         if card.is_wild_card:
-            # A wild card lets the team claim any not-yet-claimed regular
-            # card, regardless of that card's current visibility - that's
-            # the whole point of a wild card.
+            # A wild card lets the team claim a not-yet-claimed regular
+            # card regardless of that card's current visibility - that's
+            # the whole point of a wild card. What it does *not* ignore is
+            # where the card may be played: its challenge hangs off
+            # something that only exists in some gemeentes.
             if target_card_id is None:
                 raise InvalidActionError(
                     "Claiming a wild card requires a 'target_card_id' query parameter "
@@ -422,6 +428,13 @@ def claim_card(
                 raise InvalidActionError("The target card must be a regular (non-wild) card.")
             if target_card.card_state == CardState.CLAIMED:
                 raise InvalidActionError(f"Target card {target_card_id} has already been claimed.")
+
+            allowed = gemeentes_for_wild_card(card.card_name)
+            if allowed is not None and target_card.card_name not in allowed:
+                raise InvalidActionError(
+                    f"'{card.card_name}' can't be used on {target_card.card_name}. "
+                    "See GET /wildcards for the gemeentes it does apply to."
+                )
 
             target_card_was_public = target_card.card_state == CardState.ON_PUBLIC_BOARD
 
