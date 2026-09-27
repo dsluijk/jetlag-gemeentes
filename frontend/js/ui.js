@@ -523,6 +523,24 @@ function buildConfirmView(context) {
     .querySelector(".modal-close")
     .addEventListener("click", () => Modal.close());
 
+  // Whichever card is being played, a claim is of a gemeente - its own
+  // for a regular card, the one picked for it if this is a wild card - so
+  // the last screen before the claim shows which gemeente that is. A name
+  // two taps deep in a list is easy to misread; a shape is the thing you
+  // recognise from the map, which is what makes this worth stopping on.
+  //
+  // Added only once there's an outline to add, so a gemeente the index
+  // doesn't know leaves the question where it was rather than above an
+  // empty gap.
+  const claimed = card.is_wild_card ? targetName : card.card_name;
+  const url = GemeenteShapes.urlFor(claimed);
+  if (url) {
+    const shape = document.createElement("div");
+    shape.className = "claim-shape";
+    wrap.insertBefore(shape, wrap.querySelector(".modal-description"));
+    traceOutline(shape, url);
+  }
+
   const actions = document.createElement("div");
   actions.className = "modal-actions";
 
@@ -773,27 +791,47 @@ async function performDiscard(card, triggerBtn) {
   }
 }
 
+/**
+ * The end of a claim or a discard. What replaced the card that left is
+ * the news here, so it's dealt onto the sheet as the card it now is on
+ * the public board - outline above, name below, the way the deck draws
+ * one - rather than written out as a line of text.
+ *
+ * A hand rather than a single card, because a wild-card claim can empty
+ * two board slots at once and refill both. It can also be no cards at
+ * all: claiming something that was only ever on our private board takes
+ * nothing off the public board, so nothing is drawn to replace it.
+ */
 function buildResultView(context) {
   const { kind, newCards } = context;
   const wrap = document.createElement("div");
 
   const heading = kind === "claim" ? "Challenge complete!" : "Card discarded";
-  const cardsHtml =
-    newCards && newCards.length > 0
-      ? `<p class="modal-description">New card${newCards.length > 1 ? "s" : ""} added to the public board:</p>
-         <ul class="modal-list">${newCards.map((c) => `<li>${escapeHtml(c.card_name)}</li>`).join("")}</ul>`
-      : `<p class="modal-description">No new cards were drawn onto the public board.</p>`;
+  const drawn = newCards || [];
 
   wrap.innerHTML = `
     <div class="modal-header">
       <h2>${heading}</h2>
       <button type="button" class="modal-close" aria-label="Close">&times;</button>
     </div>
-    ${cardsHtml}
+    ${
+      drawn.length > 0
+        ? `<p class="draw-result__caption">Drawn onto the public board</p>`
+        : `<p class="modal-description">No new cards were drawn onto the public board.</p>`
+    }
   `;
   wrap
     .querySelector(".modal-close")
     .addEventListener("click", () => Modal.close());
+
+  if (drawn.length > 0) {
+    const hand = document.createElement("div");
+    hand.className = "drawn-cards";
+    drawn.forEach((card, index) =>
+      hand.appendChild(buildDrawnCard(card, index)),
+    );
+    wrap.appendChild(hand);
+  }
 
   const actions = document.createElement("div");
   actions.className = "modal-actions";
@@ -806,6 +844,86 @@ function buildResultView(context) {
   wrap.appendChild(actions);
 
   return wrap;
+}
+
+/**
+ * One dealt card, at the size of something meant to be looked at rather
+ * than picked out of a row. `index` is only its place in the hand: it
+ * staggers the reveal, so a second card lands after the first instead of
+ * alongside it.
+ */
+function buildDrawnCard(card, index) {
+  const tile = document.createElement("div");
+  tile.className = `drawn-card${card.is_wild_card ? " drawn-card--wild" : ""}`;
+  tile.style.setProperty("--i", String(index));
+
+  const stage = document.createElement("div");
+  stage.className = "drawn-card__stage";
+
+  const name = document.createElement("p");
+  name.className = "drawn-card__name";
+  name.textContent = card.card_name;
+
+  tile.appendChild(stage);
+  tile.appendChild(name);
+
+  // The same two sources the deck draws from: the index for a gemeente,
+  // the hand-drawn star for a wild card, which isn't a place.
+  const url = card.is_wild_card
+    ? new URL(CONFIG.WILDCARD_SHAPE_PATH, document.baseURI).href
+    : GemeenteShapes.urlFor(card.card_name);
+  if (url) traceOutline(stage, url);
+
+  return tile;
+}
+
+/**
+ * Inks an outline into the box it was given: fetches the SVG, tells each
+ * of its paths how long it is, and starts the trace. Both screens that
+ * draw a gemeente this way - the confirm step before a claim and the
+ * reveal after one - come through here; how long the trace takes and what
+ * it's framed in is the caller's business, in CSS.
+ *
+ * Deliberately not awaited - the modal is built synchronously and is on
+ * screen before this lands. The trace is timed from the moment the
+ * outline arrives rather than from the render, so a cold fetch delays the
+ * animation instead of half-playing it, and an outline that never arrives
+ * leaves what's around it alone, exactly as the deck does.
+ */
+async function traceOutline(stage, url) {
+  const svg = await GemeenteShapes.fetchOutline(url);
+  // The modal moved on while this was in flight - another card opened, a
+  // claim confirmed, a freeze coming down - so there's nothing left to ink.
+  if (!svg || !stage.isConnected) return;
+
+  svg.classList.add("traced-outline");
+  // The gemeente is named in words either side of this on both screens;
+  // the file's own <title> would only have a screen reader say it twice.
+  svg.setAttribute("aria-hidden", "true");
+
+  // The line the trace draws with, as a fraction of the shape's own
+  // longest side rather than a flat number of user units: the generated
+  // gemeentes are all fitted to a 1000-unit viewBox, but the wild card's
+  // star is hand-drawn in a box a tenth of that, where the same number
+  // would come out ten times as heavy.
+  const box = svg.viewBox.baseVal;
+  const longest = Math.max(box.width, box.height) || 1000;
+  svg.style.setProperty("--outline-stroke", longest * 0.012);
+
+  stage.appendChild(svg);
+
+  // How long a dash has to be to cover the whole outline, which is the
+  // dash the trace slides into place (see .traced-outline path).
+  // Measured here rather than normalised away with the `pathLength`
+  // attribute, which not every browser applies to dash arrays - and
+  // measured after the append, since getTotalLength() wants the path in a
+  // document. Before the next paint either way, so nothing shows
+  // undashed.
+  for (const path of svg.querySelectorAll("path")) {
+    path.style.setProperty("--outline-length", path.getTotalLength());
+  }
+
+  svg.classList.add("traced-outline--inking");
 }
 
 // ---------------------------------------------------------------------
