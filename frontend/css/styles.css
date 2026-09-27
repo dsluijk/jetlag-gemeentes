@@ -808,10 +808,14 @@ button {
   margin-bottom: 0.1rem;
 }
 
-/* The fold holding the wild cards that apply here but aren't on the board.
-   Deliberately not an entry itself - no panel, no border - so it reads as
-   a line about the list rather than another card in it. */
-.wild-more > summary {
+/* The two muted fold lines on the sheet: the one holding the wild cards
+   that apply here but aren't on the board, and the one holding a gemeente's
+   own challenge text when a wild card is the only way to take it.
+   Deliberately not entries themselves - no panel, no border - so they read
+   as a line about what's behind them rather than another card in the
+   list. */
+.wild-more > summary,
+.card-detail__fold-summary {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -822,16 +826,25 @@ button {
   padding: 0.2rem 0.1rem;
 }
 
-.wild-more > summary::-webkit-details-marker {
+.wild-more > summary::-webkit-details-marker,
+.card-detail__fold-summary::-webkit-details-marker {
   display: none;
 }
 
-.wild-more > summary:hover {
+.wild-more > summary:hover,
+.card-detail__fold-summary:hover {
   color: var(--ink);
 }
 
-.wild-more[open] > summary {
+.wild-more[open] > summary,
+.card-detail__fold[open] > .card-detail__fold-summary {
   margin-bottom: 0.5rem;
+}
+
+/* Stands where the open text panel would have: the wild cards below it keep
+   the gap they'd have from one. */
+.card-detail__fold {
+  margin-bottom: 0.9rem;
 }
 
 /* Nothing above them when the fold is the only thing in the section. */

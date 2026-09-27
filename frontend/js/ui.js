@@ -407,9 +407,32 @@ const Modal = {
   },
 };
 
+/**
+ * True when a wild card is the only way this gemeente can still be taken:
+ * nothing has claimed it, its own challenge isn't on a board for us, and a
+ * wild card that applies here is in play.
+ *
+ * The one case where the gemeente's own challenge folds shut. It stays at
+ * the top of the sheet either way - it is the gemeente you tapped - but
+ * printed open it spends half the sheet on the one challenge here that
+ * can't be played, which leaves the card that can looking like a footnote
+ * under it.
+ */
+function wildcardLeads(card) {
+  if (card.is_wild_card || card.card_state === "Claimed") return false;
+  if (State.isOnBoardForMe(card)) return false;
+  return State.wildcardsFor(card.card_name).some((c) =>
+    State.isOnBoardForMe(c),
+  );
+}
+
 function buildDetailView(context) {
   const { card, error } = context;
   const wrap = document.createElement("div");
+  // Whether a wild card is the only way this gemeente can still be taken.
+  // Nothing moves on the sheet if so - only which of the two challenges is
+  // printed open, and which is a line to unfold.
+  const wildLead = wildcardLeads(card);
   wrap.className = card.is_wild_card
     ? "card-detail card-detail--wild"
     : "card-detail";
@@ -438,16 +461,7 @@ function buildDetailView(context) {
     </div>
     <span class="card-detail__rule" aria-hidden="true"></span>
     ${statusPillHtml(card)}
-    ${
-      card.challenge_description
-        ? `<p class="card-detail__body">${escapeHtml(card.challenge_description)}</p>`
-        : `<p class="card-detail__body card-detail__body--empty">No challenge text has been added for this card yet.</p>`
-    }
-    ${
-      card.challenge_link
-        ? `<p class="modal-link"><a href="${escapeHtml(card.challenge_link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(card.challenge_link)}</a></p>`
-        : ""
-    }
+    ${wildLead ? foldedChallengeHtml(card) : challengeBodyHtml(card)}
     ${error ? `<p class="modal-error">${escapeHtml(error)}</p>` : ""}
   `;
 
@@ -468,10 +482,10 @@ function buildDetailView(context) {
       ? "Discard a card first to claim anything else."
       : `Waiting for ${pendingTeamLabel()} to discard a card.`;
     wrap.appendChild(note);
-  } else if (
-    card.card_state === "OnPublicBoard" ||
-    card.card_state === "OnPrivateBoard"
-  ) {
+  } else if (State.isOnBoardForMe(card)) {
+    // Not merely "on a board": another team's private card would be theirs
+    // to claim, and a button here would only be refused. In a wild-card-led
+    // sheet this is what keeps the unplayable challenge buttonless.
     appendClaimBlock(wrap, context);
   }
 
@@ -481,6 +495,7 @@ function buildDetailView(context) {
   if (!card.is_wild_card) {
     const wilds = buildWildcardSection(card.card_name, {
       playable: !frozen && card.card_state !== "Claimed",
+      lead: wildLead,
     });
     if (wilds) wrap.appendChild(wilds);
   }
@@ -516,6 +531,46 @@ function statusPillHtml(card, extraClass = "") {
     return `<span class="${classes("board")}">On your private board</span>`;
   }
   return `<span class="${classes("off")}">Not on the board</span>`;
+}
+
+/**
+ * A challenge's text and its link, as every part of the sheet shows them:
+ * the gemeente at the top, open or behind its fold, and each wild card in
+ * the list below.
+ */
+function challengeBodyHtml(card) {
+  return `
+    ${
+      card.challenge_description
+        ? `<p class="card-detail__body">${escapeHtml(card.challenge_description)}</p>`
+        : `<p class="card-detail__body card-detail__body--empty">No challenge text has been added for this card yet.</p>`
+    }
+    ${
+      card.challenge_link
+        ? `<p class="modal-link"><a href="${escapeHtml(card.challenge_link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(card.challenge_link)}</a></p>`
+        : ""
+    }
+  `;
+}
+
+/**
+ * The same challenge text, folded shut - what a gemeente's own challenge
+ * gets when a wild card is the only way to take it. It keeps the top of the
+ * sheet, title and status pill and all, because it is still the gemeente
+ * you tapped; it just stops spending half the sheet on a challenge that
+ * can't be played, which is what left the wild cards below it looking like
+ * a footnote.
+ */
+function foldedChallengeHtml(card) {
+  return `
+    <details class="card-detail__fold">
+      <summary class="card-detail__fold-summary">
+        <span>Read the challenge</span>
+        <span class="wild-entry__chevron" aria-hidden="true"></span>
+      </summary>
+      ${challengeBodyHtml(card)}
+    </details>
+  `;
 }
 
 /**
@@ -605,8 +660,14 @@ function appendClaimBlock(wrap, context) {
  * `playable` is false when a claim couldn't go through anyway - the game
  * is frozen, or this gemeente is already taken - and then no entry gets a
  * button, however well placed the card is.
+ *
+ * `lead` is true when these wild cards are the only way left to take the
+ * gemeente. The list keeps its place under the gemeente's own challenge -
+ * that challenge is still what the sheet is about - but the cards in play
+ * open on arrival, since with the challenge above them folded shut they are
+ * the only text here worth reading.
  */
-function buildWildcardSection(gemeenteName, { playable }) {
+function buildWildcardSection(gemeenteName, { playable, lead = false }) {
   const wildcards = State.wildcardsFor(gemeenteName);
   if (wildcards.length === 0) return null;
 
@@ -620,7 +681,9 @@ function buildWildcardSection(gemeenteName, { playable }) {
   const rest = wildcards.filter((c) => !State.isOnBoardForMe(c));
 
   for (const wildcard of inPlay) {
-    section.appendChild(buildWildcardEntry(wildcard, gemeenteName, playable));
+    section.appendChild(
+      buildWildcardEntry(wildcard, gemeenteName, { playable, open: lead }),
+    );
   }
 
   if (rest.length > 0) {
@@ -638,7 +701,9 @@ function buildWildcardSection(gemeenteName, { playable }) {
       </summary>
     `;
     for (const wildcard of rest) {
-      more.appendChild(buildWildcardEntry(wildcard, gemeenteName, playable));
+      more.appendChild(
+        buildWildcardEntry(wildcard, gemeenteName, { playable }),
+      );
     }
     section.appendChild(more);
   }
@@ -651,26 +716,26 @@ function buildWildcardSection(gemeenteName, { playable }) {
  * challenge text behind a <details> because these descriptions run long
  * and the list is there to be scanned first. A real element rather than a
  * hand-rolled toggle, so it keeps its keyboard handling for free.
+ *
+ * `open` starts it unfolded, for a wild card that is the only way left to
+ * take the gemeente - with the gemeente's own challenge folded shut above,
+ * this is the text the team came for, not something to dig for.
  */
-function buildWildcardEntry(wildcard, gemeenteName, playable) {
+function buildWildcardEntry(
+  wildcard,
+  gemeenteName,
+  { playable, open = false },
+) {
   const entry = document.createElement("details");
   entry.className = "wild-entry";
+  entry.open = open;
   entry.innerHTML = `
     <summary class="wild-entry__summary">
       <span class="wild-entry__name">${escapeHtml(wildcard.card_name)}</span>
       ${statusPillHtml(wildcard, "wild-entry__status")}
       <span class="wild-entry__chevron" aria-hidden="true"></span>
     </summary>
-    ${
-      wildcard.challenge_description
-        ? `<p class="card-detail__body">${escapeHtml(wildcard.challenge_description)}</p>`
-        : `<p class="card-detail__body card-detail__body--empty">No challenge text has been added for this card yet.</p>`
-    }
-    ${
-      wildcard.challenge_link
-        ? `<p class="modal-link"><a href="${escapeHtml(wildcard.challenge_link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(wildcard.challenge_link)}</a></p>`
-        : ""
-    }
+    ${challengeBodyHtml(wildcard)}
   `;
 
   if (playable && State.isOnBoardForMe(wildcard)) {
@@ -749,7 +814,9 @@ async function performClaim(card, targetName, triggerBtn) {
   triggerBtn.disabled = true;
   triggerBtn.textContent = "Claiming...";
   try {
-    const targetId = card.is_wild_card ? State.cardByName(targetName).card_id : null;
+    const targetId = card.is_wild_card
+      ? State.cardByName(targetName).card_id
+      : null;
     const newCards = await Api.claimCard(
       State.gameId,
       State.myTeamColor,
