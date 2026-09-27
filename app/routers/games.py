@@ -3,6 +3,7 @@ Game endpoints:
 
     GET  /games
     POST /{game_id}/create
+    GET  /{game_id}/status
     GET  /{game_id}/teams
     GET  /{game_id}/{team_color}/cards
     PUT  /{game_id}/{team_color}/claim/{card_id}
@@ -19,7 +20,7 @@ from sqlmodel import Session
 
 from app.database import get_session
 from app.models import Card, Team, TeamColor
-from app.schemas import GameCreateRequest, GameCreateResponse, GameSummary
+from app.schemas import GameCreateRequest, GameCreateResponse, GameStatus, GameSummary
 from app.services import (
     CardNotFoundError,
     CardNotVisibleError,
@@ -29,6 +30,7 @@ from app.services import (
     claim_card,
     create_game,
     discard_card,
+    game_status,
     get_team_or_raise,
     get_cards_for_team,
     list_games,
@@ -87,6 +89,21 @@ def create_game_endpoint(
         cards_seeded=result.cards_seeded,
         cards_on_public_board=result.cards_on_public_board,
     )
+
+
+@router.get(
+    "/{game_id}/status",
+    response_model=GameStatus,
+    summary="Whether the game has started yet, and the instant it does",
+)
+def game_status_endpoint(
+    game_id: str = GameIdPath,
+    session: Session = Depends(get_session),
+):
+    try:
+        return game_status(session, game_id)
+    except GameNotFoundError as exc:
+        _raise_as_http(exc)
 
 
 @router.get(
