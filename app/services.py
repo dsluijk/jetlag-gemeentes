@@ -12,10 +12,11 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm.session import make_transient
 from sqlmodel import Session, select
 
+from app.auth import generate_team_token
 from app.challenges import CHALLENGES
 from app.game_data import EMPTY_CHALLENGE, GEMEENTES, WILD_CARDS
 from app.models import Card, CardState, Team, TeamColor
-from app.schemas import GameSummary, TeamCreate
+from app.schemas import GameSummary, TeamCreate, TeamToken
 
 PRIVATE_BOARD_CARDS_PER_TEAM = 4
 PUBLIC_BOARD_INITIAL_CARDS = 7
@@ -244,9 +245,25 @@ def create_game(session: Session, game_id: str, teams: List[TeamCreate]) -> Game
 
     try:
         now = datetime.utcnow()
-        # 1. Teams
+        # 1. Teams, each with a freshly generated token. The tokens are
+        #    collected as plain schema objects here rather than read back
+        #    off the rows later: after the commit at the end of this
+        #    function those rows are expired, and this is the only moment
+        #    the API ever hands a token out.
+        created_teams: List[TeamToken] = []
         for t in teams:
-            session.add(Team(game_id=game_id, team_color=t.team_color, team_name=t.team_name))
+            token = generate_team_token()
+            session.add(Team(
+                game_id=game_id,
+                team_color=t.team_color,
+                team_name=t.team_name,
+                token=token,
+            ))
+            created_teams.append(TeamToken(
+                team_color=t.team_color,
+                team_name=t.team_name,
+                token=token,
+            ))
 
         # 2. Seed the full deck: all gemeentes + wild cards, InDeck, with the
         #    challenge text imported from the sheet. A card whose challenge
@@ -318,15 +335,15 @@ def create_game(session: Session, game_id: str, teams: List[TeamCreate]) -> Game
         raise
 
     return GameCreationResult(
-        teams_created=len(teams),
+        teams=created_teams,
         cards_seeded=total_cards_seeded,
         cards_on_public_board=len(public_cards),
     )
 
 
 class GameCreationResult:
-    def __init__(self, teams_created: int, cards_seeded: int, cards_on_public_board: int):
-        self.teams_created = teams_created
+    def __init__(self, teams: List[TeamToken], cards_seeded: int, cards_on_public_board: int):
+        self.teams = teams
         self.cards_seeded = cards_seeded
         self.cards_on_public_board = cards_on_public_board
 

@@ -41,6 +41,19 @@
 
       <div id="join-error" class="modal-error" hidden></div>
 
+      <!-- Shown only once the backend confirms the cookie still signs
+           this browser in; the form below stays usable either way. -->
+      <section id="join-resume" class="join__resume" hidden>
+        <button
+          id="join-resume-btn"
+          type="button"
+          class="btn btn--primary btn--block"
+        >
+          Continue
+        </button>
+        <p id="join-resume-hint" class="join__hint"></p>
+      </section>
+
       <div class="modal-field">
         <label for="join-game">Game</label>
         <select id="join-game" disabled></select>
@@ -49,6 +62,20 @@
       <div class="modal-field" role="group" aria-labelledby="join-team-label">
         <span id="join-team-label" class="join__label">Team</span>
         <div id="join-teams" class="discard-list"></div>
+      </div>
+
+      <div class="modal-field">
+        <label for="join-token">Team code</label>
+        <input
+          id="join-token"
+          type="text"
+          autocapitalize="characters"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <p class="join__hint">
+          The code for your team, from whoever set the game up.
+        </p>
       </div>
 
       <div class="modal-actions">

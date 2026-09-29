@@ -223,6 +223,11 @@ button {
   transform: none;
 }
 
+.btn--block {
+  display: block;
+  width: 100%;
+}
+
 .btn--primary {
   background: var(--accent);
   color: var(--accent-ink);
@@ -935,6 +940,20 @@ button {
   margin: 0 0 1.5rem;
 }
 
+/* The resume shortcut sits above the pickers, so it has to read as the
+   fast path rather than as another field - hence full width and a rule
+   under it separating it from the form it's an alternative to. */
+.join__resume {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.join__resume .join__hint {
+  text-align: center;
+  margin: 0.5rem 0 0;
+}
+
 /* The team group is labelled by a <span>, not a <label>, so it can't
    lean on the .modal-field label rule. */
 .join__label {
@@ -1015,6 +1034,33 @@ button {
   font-size: 1rem;
   line-height: 1;
   color: var(--ink-muted);
+}
+
+/* One row per team on the post-create screen, listing the code that team
+   joins with. Same swatch-then-name shape as .create-team above, with the
+   code pushed to the far end so the column of them stays scannable while
+   they're being written down. */
+.create-token {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.create-token__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Monospaced and spaced out: this gets read off a screen and typed into
+   someone else's phone, so the characters have to stay distinguishable. */
+.create-token__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------ */
