@@ -156,6 +156,15 @@ websockets - only the refresh button (spinner icon, top right), plus an
 automatic refresh right after your own claim/discard so you immediately
 see its effect. To see _other_ teams' moves, someone has to tap refresh.
 
+**The draw reveal**: a claim or a discard ends on whatever replaced the
+card that left, dealt onto the sheet as a card rather than named in a
+list - outline above, name below, the way the deck draws one. The outline
+is a live `<svg>` here instead of the deck's `mask-image`, which is what
+lets it trace itself; the `Drawn cards` block in `css/styles.css` owns the
+timeline, and `traceOutline()` in `js/ui.js` supplies the two things only
+JS can measure. It degrades the way the deck does: an outline that never
+arrives leaves a card wearing its name.
+
 **The freeze**: a mandatory discard stops the whole game, not just the
 team that is discarding - nobody may claim until that card is gone - so every
 board is frozen behind the same full-screen wall. Frozen, not

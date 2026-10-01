@@ -331,6 +331,18 @@ same slot. That one is hand-drawn rather than generated - there's nothing in
 the KML to derive it from - and `renderCardsPanel()` points at it through
 `CONFIG.WILDCARD_SHAPE_PATH`, the same way it points at an outline.
 
+The reveal at the end of a claim or a discard draws them a second way. The
+card that replaced the one that left is dealt onto the result modal as a card
+in its own right, and its outline inks itself in. That needs a live `<path>`
+rather than a flat mask, so there the SVG is fetched and inlined
+(`GemeenteShapes.fetchOutline()`): the path is given a single dash long enough
+to cover the whole outline and pushed out of sight, and the animation slides
+that dash back into place. Only the browser can measure a path, so
+`traceOutline()` in `js/ui.js` hands the length over to CSS after inserting
+it - along with a stroke width taken from the file's own viewBox, since the
+wild card's star is hand-drawn in a box a tenth the size of a generated
+gemeente's and a flat width would come out ten times as heavy on it.
+
 Shapes are decoration - the card still names its gemeente - so if the index
 fails to load the deck falls back to name-only cards and logs a warning
 rather than taking the board down.
