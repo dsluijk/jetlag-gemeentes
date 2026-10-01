@@ -41,21 +41,37 @@ request same-origin.
 ## Pages
 
 - **`index.html`** - the join page at `/`. Lists games from `GET /games`
-  and the chosen game's teams from `GET /{game_id}/teams`, then sends you
-  to the board. It pre-fills your last pick from `localStorage` but never
-  skips itself, so switching teams stays possible. Links that still point
-  at `/?game=…&team=…` are redirected to the board.
+  and the chosen game's teams from `GET /{game_id}/teams`, takes your
+  team's code, and `POST`s it to `/{game_id}/{team_color}/login` before
+  sending you to the board - so a wrong code is reported here, next to
+  the field that fixes it, rather than on a board that can't load. It
+  pre-fills your last game and team from `localStorage` but never the
+  code, and never skips itself, so switching teams stays possible. Links
+  that still point at `/?game=…&team=…` are redirected to the board.
+
+  If you're already signed in, a **Continue as …** button appears above the
+  form and goes straight to the board. The cookie is `HttpOnly`, so the
+  page can't read it to find that out: it asks
+  `GET /{game_id}/{team_color}/session` about the remembered game and
+  team, and only shows the button on a `200`. That request isn't awaited
+  before the pickers render, and a `401` is passed over in silence -
+  the form is already what you'd do instead.
 - **`create.html`** - the create page. A game code plus one row per team
   (colour + name, two to five of them), posted to
   `POST /{game_id}/create`. The button stays disabled until the form
   would actually be accepted, so the only errors that surface are the
-  server's - chiefly a code that's already taken. On success it writes
-  the new game into the same `localStorage` entry the join page reads and
-  sends you there, so the game is already selected when you arrive.
+  server's - chiefly a code that's already taken. On success the form is
+  replaced by the per-team join codes the backend generated. That's the
+  only time they're shown - they're generated server-side and no endpoint
+  hands them back - so the page stops here instead of navigating on. It
+  does still write the new game into the same `localStorage` entry the
+  join page reads, so the game is already selected when you go there.
 - **`board.html`** - the map board, opened as
   `board.html?game=<GAME_ID>&team=<TEAM_COLOR>`. Without both parameters
-  it redirects back to the join page. There's no login flow, so the game
-  id and team color are still just URL parameters.
+  it redirects back to the join page, and so does a `401` from any
+  refresh: the URL says which team to draw, but the cookie set at login
+  is what decides which team you may draw, so hand-editing `?team=` to
+  peek at another board lands you back at the join page.
 
 ## Architecture
 
@@ -71,7 +87,7 @@ jetlag-frontend/
 ├── img/gemeentes/              # generated: one SVG outline per gemeente + index.json
 └── js/
     ├── config.js       # all tunables: API URL, colors, basemap toggle, gemeente list
-    ├── api.js          # fetch wrappers for the backend endpoints
+    ├── api.js          # fetch wrappers for the backend endpoints (incl. login)
     ├── join.js         # join page: game/team pickers (loads only config.js + api.js)
     ├── create.js       # create page: game code + team rows (loads only config.js + api.js)
     ├── kml-parser.js   # KML -> GeoJSON, using the browser's DOMParser

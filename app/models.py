@@ -80,3 +80,4 @@ class Team(SQLModel, table=True):
 
     team_name: str
     can_discard_card: bool = Field(default=False)
+    token: str
