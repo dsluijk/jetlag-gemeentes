@@ -2,8 +2,33 @@
  * Thin wrapper around the jetlag-api backend. Every call throws a
  * regular Error with a human-readable message on failure, so callers
  * can just try/catch and show err.message.
+ *
+ * The team's token isn't passed around here: login() has the backend set
+ * an HttpOnly cookie, which the browser then attaches to every
+ * same-origin request by itself. Nothing below has to know about it.
  */
 const Api = {
+  /**
+   * Whether the cookie this browser already holds still signs it in as
+   * `teamColor`. Resolves with the team if it does; throws otherwise,
+   * which is a normal answer and not a failure worth showing.
+   */
+  getSession(gameId, teamColor) {
+    return request(`${gameId}/${teamColor}/session`);
+  },
+
+  /**
+   * Trades a team's token for that cookie. Resolves with the team on
+   * success; a wrong token throws with `unauthorized` set.
+   */
+  login(gameId, teamColor, token) {
+    return request(`${gameId}/${teamColor}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    });
+  },
+
   /** Every game that exists, as [{game_id, team_count}] - drives the join page. */
   getGames() {
     return request("games");
@@ -57,7 +82,13 @@ const Api = {
 async function request(path, options = {}) {
   let response;
   try {
-    response = await fetch(`${CONFIG.API_BASE_URL}${path}`, options);
+    // Spread last so a caller could still override it; "same-origin" is
+    // already the default, but the token cookie rides on it, so it's
+    // worth saying out loud rather than inheriting.
+    response = await fetch(`${CONFIG.API_BASE_URL}${path}`, {
+      credentials: "same-origin",
+      ...options,
+    });
   } catch (networkErr) {
     throw new Error(
       "Can't reach the server. Check your connection and try again.",
@@ -75,7 +106,12 @@ async function request(path, options = {}) {
     } catch (_) {
       // Response wasn't JSON - keep the status text.
     }
-    throw new Error(detail);
+    const error = new Error(detail);
+    // Lets a caller tell "your token is wrong or gone" apart from every
+    // other failure: the board sends you back to the join page for this
+    // one rather than toasting something you can't act on.
+    error.unauthorized = response.status === 401;
+    throw error;
   }
 
   if (response.status === 204) return null;

@@ -40,6 +40,9 @@ function initCreate() {
   codeInput.addEventListener("input", updateSubmitState);
   document.getElementById("create-add-team").addEventListener("click", addTeam);
   document.getElementById("create-btn").addEventListener("click", submit);
+  document
+    .getElementById("create-done-btn")
+    .addEventListener("click", () => (window.location.href = "index.html"));
 
   renderRows();
   codeInput.focus();
@@ -186,8 +189,9 @@ async function submit() {
   button.textContent = "Creating...";
   hideCreateError();
 
+  let game;
   try {
-    await Api.createGame(
+    game = await Api.createGame(
       gameId,
       rows.map((row) => ({
         team_color: row.color,
@@ -207,7 +211,50 @@ async function submit() {
   // just created already selected. Deliberately not skipping it: the
   // organiser still has to say which team they're on.
   writeRemembered(gameId, rows[0].color);
-  window.location.href = "index.html";
+  showTokens(gameId, game.teams);
+}
+
+// ---------------------------------------------------------------------
+// Team codes
+// ---------------------------------------------------------------------
+
+/**
+ * Replaces the form with the team codes the backend just generated.
+ *
+ * This is the only time they're shown: they're generated server-side and
+ * there's no endpoint that hands them back out, so navigating on to the
+ * join page by itself - which is what this page used to do - would lose
+ * them. Whoever set the game up reads them off here and passes each team
+ * its own.
+ */
+function showTokens(gameId, teams) {
+  document.getElementById("create-done-game").textContent = gameId;
+  document
+    .getElementById("create-done-teams")
+    .replaceChildren(...teams.map(makeTokenRow));
+
+  document.getElementById("create-form").hidden = true;
+  document.getElementById("create-done").hidden = false;
+}
+
+function makeTokenRow(team) {
+  const row = document.createElement("div");
+  row.className = "create-token";
+
+  const dot = document.createElement("span");
+  dot.className = "join-team__dot";
+  dot.style.background = CONFIG.TEAM_COLORS[team.team_color] || "#999";
+
+  const name = document.createElement("span");
+  name.className = "create-token__name";
+  name.textContent = team.team_name;
+
+  const code = document.createElement("code");
+  code.className = "create-token__code";
+  code.textContent = team.token;
+
+  row.append(dot, name, code);
+  return row;
 }
 
 // ---------------------------------------------------------------------

@@ -14,6 +14,7 @@
  */
 const GemeenteShapes = {
   _urls: new Map(),
+  _outlines: new Map(),
 
   /** Fetch the index. Throws; the caller decides how loudly to fail. */
   async load() {
@@ -39,5 +40,51 @@ const GemeenteShapes = {
    */
   urlFor(name) {
     return this._urls.get(name) || null;
+  },
+
+  /**
+   * The SVG at `url` as a detached <svg> element rather than a URL to
+   * point CSS at. A mask can only be revealed all at once, but a live
+   * <path> can be traced, which is what the reveal after a claim or a
+   * discard draws with - see traceOutline() in js/ui.js.
+   *
+   * Takes a URL rather than a gemeente name so the wild card's star,
+   * which isn't a place and so isn't in the index, traces through the
+   * same code. Resolves to null on any failure, like urlFor(): the card
+   * it decorates still says which gemeente it is.
+   *
+   * Each call gets its own copy, since two reveals can be looking at the
+   * same gemeente and a node only lives in one place at a time.
+   */
+  async fetchOutline(url) {
+    let pending = this._outlines.get(url);
+    if (!pending) {
+      pending = fetch(url)
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.text();
+        })
+        .then((text) => {
+          // A parse failure hands back a <parsererror> document rather
+          // than throwing, so the root element is what gets checked.
+          const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+          if (doc.documentElement.localName !== "svg") {
+            throw new Error("not an SVG");
+          }
+          return doc.documentElement;
+        })
+        .catch((err) => {
+          // Left out of the cache, so the next reveal of the same
+          // gemeente tries again: this is decoration, and one dropped
+          // request shouldn't cost it the rest of the game.
+          this._outlines.delete(url);
+          console.warn(`Couldn't load the outline at ${url}.`, err);
+          return null;
+        });
+      this._outlines.set(url, pending);
+    }
+
+    const svg = await pending;
+    return svg ? svg.cloneNode(true) : null;
   },
 };

@@ -49,6 +49,16 @@ const MapView = {
       "top-right",
     );
 
+    this.map.addControl(
+      new maplibregl.GeolocateControl({
+        positionOptions: {
+            enableHighAccuracy: true
+        },
+        trackUserLocation: true
+      }),
+      "top-right",
+    );
+
     if (CONFIG.SHOW_BASEMAP) {
       this._basemapOpacityControl = createBasemapOpacityControl(
         (opacity) => this.setBaseMapOpacity(opacity),

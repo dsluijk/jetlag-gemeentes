@@ -83,6 +83,15 @@ window.refreshAll = async function refreshAll() {
     MapView.applyStyles();
     UI.render();
   } catch (err) {
+    if (err.unauthorized) {
+      // Either the cookie is for a different team than the URL asks for -
+      // someone hand-editing ?team= to peek at another board - or it
+      // expired. Both are fixed by joining again, and neither is
+      // something a toast on a board that can't load would help with.
+      // replace() so Back doesn't bounce straight back here.
+      window.location.replace("index.html");
+      return;
+    }
     UI.toast(`Couldn't refresh: ${err.message}`, "error");
   } finally {
     refreshBtn.classList.remove("spinning");
