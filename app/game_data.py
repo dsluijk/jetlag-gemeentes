@@ -152,18 +152,19 @@ WILD_CARDS: Dict[str, List[str]] = {
         "Rijssen-Holten",
         "Rozendaal",
         "Steenwijkerland",
+        "Zwartewaterland",
     ],
     # From the spreadsheet's own "Gemeenten met Burger King" note, minus
     # Amersfoort, which isn't in the deck. The sheet marks Zevenaar
     # "gesloten?" - it is kept here, so drop it if that branch really has
     # closed.
     "Burger King Wild Card": [
+        "Amersfoort",
         "Apeldoorn",
         "Arnhem",
         "Barneveld",
         "Enschede",
         "Harderwijk",
-        "Zevenaar",
         "Zwolle",
     ],
     # Drafted: every gemeente in the deck with a train station. Shorter to
@@ -212,7 +213,6 @@ WILD_CARDS: Dict[str, List[str]] = {
         "Renkum",
         "Rheden",
         "Rijssen-Holten",
-        "Staphorst",
         "Steenwijkerland",
         "Twenterand",
         "Voorst",
@@ -223,18 +223,17 @@ WILD_CARDS: Dict[str, List[str]] = {
         "Zutphen",
         "Zwolle",
     ],
-    # Drafted, UNVERIFIED - check intratuin.nl/vestigingen before playing
-    # with this one. The sheet has no note for it and store locations are
-    # not something this list can be derived from.
     "Intratuin Wild Card": [
         "Almelo",
         "Apeldoorn",
+        "Arnhem",
+        "Aalten",
+        "Barneveld",
+        "Deventer",
         "Duiven",
-        "Ede",
         "Enschede",
-        "Hardenberg",
+        "Lochem",
         "Nijkerk",
-        "Zutphen",
         "Zwolle",
     ],
     # Drafted, UNVERIFIED - the least reliable list here. The sheet has no
@@ -244,24 +243,18 @@ WILD_CARDS: Dict[str, List[str]] = {
     # before playing.
     "Kinderboerderij Wild Card": [
         "Almelo",
-        "Apeldoorn",
         "Arnhem",
         "Barneveld",
-        "Borne",
+        "Bronckhorst",
         "Deventer",
-        "Doetinchem",
-        "Ede",
+        "Duiven",
         "Enschede",
-        "Harderwijk",
-        "Hengelo",
+        "Hardenberg",
         "Kampen",
-        "Nijkerk",
+        "Lochem",
+        "Losser",
         "Oldenzaal",
         "Raalte",
-        "Rheden",
-        "Steenwijkerland",
-        "Wageningen",
-        "Winterswijk",
         "Zutphen",
         "Zwolle",
     ],
