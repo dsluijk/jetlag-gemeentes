@@ -17,8 +17,19 @@ async function initJoin() {
   const remembered = readRemembered();
 
   gameSelect.replaceChildren(makeOption("", "Loading games..."));
-  gameSelect.addEventListener("change", () => loadTeams(gameSelect.value, null));
+  gameSelect.addEventListener("change", () =>
+    loadTeams(gameSelect.value, null),
+  );
   document.getElementById("join-btn").addEventListener("click", openBoard);
+  // The code is deliberately never remembered, unlike the game and team:
+  // it's the one thing that says you're on this team rather than another.
+  document
+    .getElementById("join-token")
+    .addEventListener("input", updateJoinState);
+
+  // Not awaited: the shortcut is a bonus, and the pickers below
+  // shouldn't wait on a request that's allowed to come back "no".
+  offerResume(remembered.game, remembered.team);
 
   let games;
   try {
@@ -58,6 +69,44 @@ function renderGameOptions(games, rememberedGame) {
   select.disabled = false;
 }
 
+// ---------------------------------------------------------------------
+// Resume
+// ---------------------------------------------------------------------
+
+/**
+ * Offers the board straight back to whoever is still signed in.
+ *
+ * The token sits in an HttpOnly cookie, so this page can neither read it
+ * nor work out which team it belongs to. The remembered pick says which
+ * game and team to ask about, and `GET /{game}/{team}/session` - the
+ * same check every board request goes through - answers whether the
+ * cookie still signs you in as them.
+ *
+ * Anything other than a yes just means no shortcut: no cookie, a cookie
+ * for a different team, a game that's been deleted. The form below is
+ * already the answer to all of those, so none of them is worth an error
+ * banner.
+ */
+async function offerResume(gameId, teamColor) {
+  if (!gameId || !teamColor) return;
+
+  let team;
+  try {
+    team = await Api.getSession(gameId, teamColor);
+  } catch (_) {
+    return;
+  }
+
+  document.getElementById("join-resume-btn").textContent =
+    `Continue as ${team.team_name}`;
+  document.getElementById("join-resume-hint").textContent =
+    `Still signed in to ${gameId}. Or pick a game and team below.`;
+  document
+    .getElementById("join-resume-btn")
+    .addEventListener("click", () => openBoardFor(gameId, teamColor));
+  document.getElementById("join-resume").hidden = false;
+}
+
 /** Fetches and renders the teams of `gameId`, selecting `preferredColor` if it's one of them. */
 async function loadTeams(gameId, preferredColor) {
   const list = document.getElementById("join-teams");
@@ -91,24 +140,64 @@ async function loadTeams(gameId, preferredColor) {
 function selectTeam(teamColor) {
   selectedTeamColor = teamColor;
 
-  for (const button of document.querySelectorAll("#join-teams .discard-option")) {
+  for (const button of document.querySelectorAll(
+    "#join-teams .discard-option",
+  )) {
     const isSelected = button.dataset.teamColor === teamColor;
     button.classList.toggle("discard-option--selected", isSelected);
     button.setAttribute("aria-pressed", String(isSelected));
   }
 
-  const gameId = document.getElementById("join-game").value;
-  document.getElementById("join-btn").disabled = !gameId || !teamColor;
+  updateJoinState();
 }
 
-function openBoard() {
+/** The typed code, normalised to the shape the backend generated. */
+function joinToken() {
+  return document.getElementById("join-token").value.trim().toUpperCase();
+}
+
+/** Enables the join button only once there's a game, a team and a code. */
+function updateJoinState() {
+  const gameId = document.getElementById("join-game").value;
+  document.getElementById("join-btn").disabled =
+    !gameId || !selectedTeamColor || !joinToken();
+}
+
+/**
+ * Trades the code for the cookie before opening the board.
+ *
+ * Logging in here rather than letting the board discover a bad code
+ * keeps the error where it can be fixed - the field is right there - and
+ * means the board is only ever reached by a team that can actually load
+ * it.
+ */
+async function openBoard() {
   const gameId = document.getElementById("join-game").value;
   if (!gameId || !selectedTeamColor) return;
 
+  const button = document.getElementById("join-btn");
+  button.disabled = true;
+  button.textContent = "Joining...";
+  hideJoinError();
+
+  try {
+    await Api.login(gameId, selectedTeamColor, joinToken());
+  } catch (err) {
+    showJoinError(err.message);
+    button.textContent = "Open board";
+    updateJoinState();
+    return;
+  }
+
   writeRemembered(gameId, selectedTeamColor);
+  openBoardFor(gameId, selectedTeamColor);
+}
+
+/** The board's URL shape, shared by joining and resuming. */
+function openBoardFor(gameId, teamColor) {
   window.location.href = `board.html?game=${encodeURIComponent(
-    gameId
-  )}&team=${encodeURIComponent(selectedTeamColor)}`;
+    gameId,
+  )}&team=${encodeURIComponent(teamColor)}`;
 }
 
 // ---------------------------------------------------------------------

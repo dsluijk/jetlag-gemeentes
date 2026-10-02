@@ -32,36 +32,74 @@
 
       <div id="create-error" class="modal-error" hidden></div>
 
-      <div class="modal-field">
-        <label for="create-game">Game code</label>
-        <input
-          id="create-game"
-          type="text"
-          autocapitalize="characters"
-          autocomplete="off"
-          spellcheck="false"
-        />
-        <p class="join__hint">Letters and numbers only, no spaces.</p>
-      </div>
+      <!-- Swapped in for the form once the game exists: the one and only
+           time the team codes are shown. -->
+      <section id="create-done" hidden>
+        <p class="join__subtitle">
+          Game <strong id="create-done-game"></strong> is ready. Give every team
+          its own code - it's what stops anyone opening someone else's board.
+        </p>
 
-      <div class="modal-field" role="group" aria-labelledby="create-team-label">
-        <span id="create-team-label" class="join__label">Teams</span>
-        <div id="create-teams"></div>
-      </div>
+        <div class="modal-field">
+          <span class="join__label">Team codes</span>
+          <div id="create-done-teams"></div>
+          <p class="join__hint">
+            These aren't shown again. Write them down before you leave this
+            page.
+          </p>
+        </div>
 
-      <div class="modal-actions">
-        <button id="create-add-team" type="button" class="btn btn--ghost">
-          + Add team
-        </button>
-        <button id="create-btn" type="button" class="btn btn--primary" disabled>
-          Create game
-        </button>
-      </div>
+        <div class="modal-actions">
+          <button id="create-done-btn" type="button" class="btn btn--primary">
+            Go to join page
+          </button>
+        </div>
+      </section>
 
-      <p class="join__footer">
-        Joining an existing game?
-        <a class="join__link" href="index.html">Open the join page</a>.
-      </p>
+      <div id="create-form">
+        <div class="modal-field">
+          <label for="create-game">Game code</label>
+          <input
+            id="create-game"
+            type="text"
+            autocapitalize="characters"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <p class="join__hint">Letters and numbers only, no spaces.</p>
+        </div>
+
+        <div
+          class="modal-field"
+          role="group"
+          aria-labelledby="create-team-label"
+        >
+          <span id="create-team-label" class="join__label">Teams</span>
+          <div id="create-teams"></div>
+          <p class="join__hint">
+            Each team gets its own join code, handed out once the game exists.
+          </p>
+        </div>
+
+        <div class="modal-actions">
+          <button id="create-add-team" type="button" class="btn btn--ghost">
+            + Add team
+          </button>
+          <button
+            id="create-btn"
+            type="button"
+            class="btn btn--primary"
+            disabled
+          >
+            Create game
+          </button>
+        </div>
+
+        <p class="join__footer">
+          Joining an existing game?
+          <a class="join__link" href="index.html">Open the join page</a>.
+        </p>
+      </div>
     </main>
 
     <script src="js/config.js"></script>

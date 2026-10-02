@@ -223,6 +223,11 @@ button {
   transform: none;
 }
 
+.btn--block {
+  display: block;
+  width: 100%;
+}
+
 .btn--primary {
   background: var(--accent);
   color: var(--accent-ink);
@@ -568,11 +573,6 @@ button {
   color: var(--accent);
 }
 
-.modal-list {
-  margin: 0 0 0.9rem;
-  padding-left: 1.2rem;
-}
-
 .modal-error {
   background: var(--danger-ink);
   color: var(--danger);
@@ -710,6 +710,222 @@ button {
   padding: 0;
   font-style: italic;
   color: var(--ink-muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* Traced outlines                                                      */
+/* ------------------------------------------------------------------ */
+/* A gemeente that draws itself, on the two screens where one shape is the
+   whole point: the confirm step before a claim, and the reveal after one.
+   Both hand a box to traceOutline() in js/ui.js, which fetches the SVG
+   and inlines it - a live <path> rather than the deck's flat mask-image,
+   since only a path can be traced.
+
+   The trick is a single dash as long as the whole outline, shifted clear
+   of it so nothing shows, which the trace then slides back into place.
+   Only the browser can measure a path, so JS supplies --outline-length
+   (per path) and --outline-stroke (taken from the file's own viewBox,
+   since the wild card's star is drawn at a tenth the scale of a generated
+   gemeente). What's around the shape and when it starts belong to the
+   caller, through --trace-delay and --ink-delay. */
+.traced-outline {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Where a trace starts: no ink, and the dash shifted off the outline. The
+   animation hangs off --inking, which JS adds only once the file is in
+   the page, so an outline that arrives late traces from when it arrives
+   rather than turning up part-drawn or already finished. */
+.traced-outline path {
+  fill-opacity: 0;
+  stroke: currentColor;
+  stroke-width: var(--outline-stroke, 12);
+  stroke-linejoin: round;
+  stroke-dasharray: var(--outline-length);
+  stroke-dashoffset: var(--outline-length);
+}
+
+.traced-outline--inking path {
+  animation-name: outline-trace, outline-ink;
+  animation-duration: var(--trace-time, 760ms), var(--ink-time, 420ms);
+  animation-timing-function: ease-in-out, ease-out;
+  animation-fill-mode: forwards, forwards;
+  animation-delay: var(--trace-delay, 0ms), var(--ink-delay, 0ms);
+}
+
+@keyframes outline-trace {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes outline-ink {
+  to {
+    fill-opacity: 0.78; /* the deck's silhouette */
+  }
+}
+
+/* The gemeente a claim is about to take, above the question that asks
+   whether to take it. No card around this one: nothing is being dealt
+   here, and a name two taps deep in a list is easy to misread where the
+   shape you know from the map isn't. Quicker than the reveal's, too - a
+   screen someone is waiting on is no place for a flourish. */
+.claim-shape {
+  --trace-time: 620ms;
+  --trace-delay: 0ms;
+  --ink-delay: 420ms;
+
+  height: 130px;
+  margin: 0.1rem 0 1rem;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .claim-shape {
+    --ink-delay: 0ms;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Drawn cards (the reveal after a claim or a discard)                  */
+/* ------------------------------------------------------------------ */
+/* What replaced the card that left is the only news in the result modal,
+   so it's dealt onto the sheet as a card rather than listed as a line of
+   text. Built to read as .playing-card - same paper, same ink edge, same
+   proportions - at a size worth looking at.
+
+   The outline inside inks itself the way .traced-outline above describes,
+   on this screen's own timing. The whole reveal is one timeline, and the
+   three properties below are its beats: each card waits --stagger per
+   card before being dealt, its outline starts tracing --trace-lead after
+   that, and the ink washes in --fill-lead later again. Properties rather
+   than literals so reduced motion can flatten the whole sequence in one
+   place - the rule at the top of this file collapses durations but leaves
+   delays alone, which on its own would still deal the cards in one at a
+   time. */
+.drawn-cards {
+  --stagger: 200ms;
+  --trace-lead: 260ms;
+  --fill-lead: 820ms;
+
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0 0 1.2rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawn-cards {
+    --stagger: 0ms;
+    --trace-lead: 0ms;
+    --fill-lead: 0ms;
+  }
+}
+
+/* Says where the cards came from, in the same voice the card detail's
+   kicker uses above a challenge title. */
+.draw-result__caption {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-align: center;
+  margin: 0.1rem 0 0.9rem;
+}
+
+.drawn-card {
+  position: relative;
+  flex: 0 0 auto;
+  /* Capped against the viewport so two cards - the most one claim can
+     draw - still sit side by side on a narrow phone. */
+  width: min(150px, 40vw);
+  aspect-ratio: 96 / 112; /* .playing-card's */
+  display: flex;
+  flex-direction: column;
+  padding: 0.55rem;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  /* This card's place in the timeline, and the two beats the outline
+     inside it takes from that. */
+  --deal-delay: calc(var(--i) * var(--stagger));
+  --trace-delay: calc(var(--deal-delay) + var(--trace-lead));
+  --ink-delay: calc(var(--deal-delay) + var(--fill-lead));
+
+  /* Overshoots and settles, so it lands like a card put down rather than
+     a box fading in. */
+  animation: drawn-card-deal 480ms cubic-bezier(0.2, 1.25, 0.4, 1) both;
+  animation-delay: var(--deal-delay);
+}
+
+/* The same stripes the deck gives a wild card. */
+.drawn-card--wild {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--paper),
+    var(--paper) 8px,
+    #e4e2d6 8px,
+    #e4e2d6 16px
+  );
+}
+
+/* One ring, out and gone, as the ink lands. Keyed off the outline being
+   there at all, since a card with nothing to ink has nothing to sound a
+   fanfare for; box-shadow doesn't paint inside the border box, so all of
+   the ring falls outside the card. */
+.drawn-card:has(.traced-outline--inking)::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  animation: drawn-card-flash 560ms ease-out both;
+  animation-delay: var(--ink-delay);
+}
+
+/* Whatever's left of the card above its name. */
+.drawn-card__stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  color: var(--ink);
+}
+
+/* The deck's caption treatment, a size up. */
+.drawn-card__name {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.8rem;
+  line-height: 1.15;
+  text-align: center;
+  margin: 0.35rem 0 0;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  overflow-wrap: break-word;
+}
+
+@keyframes drawn-card-deal {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.9) rotate(-5deg);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(0);
+  }
+}
+
+@keyframes drawn-card-flash {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 15px transparent;
+  }
 }
 
 /* The focus ring is drawn 4px outside an option's border box, and a
@@ -1020,6 +1236,20 @@ button {
   margin: 0 0 1.5rem;
 }
 
+/* The resume shortcut sits above the pickers, so it has to read as the
+   fast path rather than as another field - hence full width and a rule
+   under it separating it from the form it's an alternative to. */
+.join__resume {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.join__resume .join__hint {
+  text-align: center;
+  margin: 0.5rem 0 0;
+}
+
 /* The team group is labelled by a <span>, not a <label>, so it can't
    lean on the .modal-field label rule. */
 .join__label {
@@ -1100,6 +1330,33 @@ button {
   font-size: 1rem;
   line-height: 1;
   color: var(--ink-muted);
+}
+
+/* One row per team on the post-create screen, listing the code that team
+   joins with. Same swatch-then-name shape as .create-team above, with the
+   code pushed to the far end so the column of them stays scannable while
+   they're being written down. */
+.create-token {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.create-token__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Monospaced and spaced out: this gets read off a screen and typed into
+   someone else's phone, so the characters have to stay distinguishable. */
+.create-token__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------ */

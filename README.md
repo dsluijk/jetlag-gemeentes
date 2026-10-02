@@ -62,6 +62,61 @@ Composite primary key: `(game_id, team_color)`.
 | team_color       | enum `TeamColor` (PK) | orange / blue / purple |
 | team_name        | str                   |                        |
 | can_discard_card | bool, default `False` |                        |
+| token            | str                   | plaintext, see [Authentication](#authentication) |
+
+## Authentication
+
+The game runs on trust - it's played among friends - but "trust" used to
+mean anyone holding a game code could read another team's private board
+before its reveal time, or claim a card in their name, by editing the
+team color in the URL. That's the one thing this stops.
+
+Each team gets a **token** when the game is created: 8 characters from an
+alphabet with no `O`/`0` or `I`/`1`/`L`, so it survives being read out
+loud and typed into someone else's phone. It is stored **in plaintext**
+on the team row and compared as-is (`app/auth.py`). Nothing is hashed,
+nothing rotates, and creating a game needs no credentials at all. That's
+deliberate: it's a speed bump that makes cheating something you'd have to
+mean, not a security boundary.
+
+The token travels in a cookie:
+
+| Attribute  | Value                                                        |
+| ---------- | ------------------------------------------------------------ |
+| name       | `gg_token`                                                    |
+| `HttpOnly` | yes - no frontend code ever reads it back                     |
+| `SameSite` | `Lax`                                                         |
+| `Max-Age`  | 30 days                                                       |
+| `Secure`   | **no** - local development is plain http, where browsers would silently drop it |
+
+`POST /{game_id}/{team_color}/login` is the only place a token is sent by
+hand; it sets that cookie, and the browser attaches it to every
+same-origin request afterwards. Because it's `HttpOnly`, the frontend
+can't tell whether it's still valid or whose it is - that's what
+`GET /{game_id}/{team_color}/session` is for. The backend serves the
+frontend itself (`app.frontend("/")` in `app/main.py`), so same-origin
+holds and there's no CORS to configure.
+
+Endpoints that act **as** a team - `/cards`, `/claim`, `/discard` - carry
+the `require_team` dependency and answer `401` without the right cookie.
+`GET /games`, `GET /{game_id}/teams` and `GET /pairs` stay open, because
+the join page has to list games and teams before anyone has a token;
+`POST /{game_id}/create` stays open too, since creating a *new* game is
+no way to cheat in an existing one.
+
+`GET /{game_id}/teams` never returns tokens - it responds with
+`TeamPublic` (`app/schemas.py`) rather than the `Team` row, which is the
+whole reason that schema exists. Adding a field to `Team` does not
+silently publish it.
+
+Tokens are shown once, on the create page, right after the game is made.
+They're plaintext in the database, so a lost one is a query rather than a
+lockout:
+
+```bash
+sqlite3 jetlag.db "SELECT team_color, team_name, token FROM teams WHERE game_id = 'ABC123'"
+# PostgreSQL: psql -c "SELECT team_color, team_name, token FROM teams WHERE game_id = 'ABC123'"
+```
 
 ## Endpoints
 
@@ -105,14 +160,21 @@ Creating a game deals every board straight away even when that happens the
 evening before - nothing is handed out to anyone until the game starts, see
 [The 10:00 kickoff](#the-1000-kickoff).
 
-### `GET /{game_id}/status`
+The response carries a freshly generated token per team, under `teams`:
 
 ```json
 {
   "game_id": "ABC123",
   "starts_at": "2026-09-28T08:00:00Z",
   "started": false,
-  "server_time": "2026-09-27T21:14:05.113Z"
+  "server_time": "2026-09-27T21:14:05.113Z",
+  "teams_created": 2,
+  "cards_seeded": 66,
+  "cards_on_public_board": 7,
+  "teams": [
+    { "team_color": "orange", "team_name": "Team Oranje", "token": "9BXG5R68" },
+    { "team_color": "purple", "team_name": "Team Paars", "token": "KEYPTRD8" }
+  ]
 }
 ```
 
@@ -125,6 +187,12 @@ _local_ time, which would put that countdown hours out. `server_time` is
 in there so it can run off the clock that actually decides when the game
 starts rather than off the phone's.
 
+This is the only response that ever contains a token - see
+[Authentication](#authentication).
+
+Each team's 4 private cards get staggered reveal times (today): 2 cards
+at 10:00, 1 at 12:00, 1 at 14:00.
+
 ### `GET /{game_id}/teams`
 
 Returns every team registered in the game (`team_color`, `team_name`,
@@ -133,7 +201,32 @@ when a team is currently allowed to discard. There's no per-team
 filtering: any client can see the full roster, which is also how a team
 finds out that _another_ team is discarding and the game is frozen.
 
+Unauthenticated, since the join page lists the teams before anyone has a
+token - and for that reason it answers with `TeamPublic`, which has no
+`token` field, rather than the team row itself.
+
+### `POST /{game_id}/{team_color}/login`
+
+Body `{"token": "9BXG5R68"}`. On a match it replies `200` with the team
+(as `TeamPublic`) and sets the `gg_token` cookie the three endpoints
+below require; otherwise `401`. The comparison is exact - the join page
+uppercases what was typed before sending it, rather than the server
+guessing. See [Authentication](#authentication).
+
+### `GET /{game_id}/{team_color}/session`
+
+**Needs that team's cookie** (`401` without it).
+
+Answers "does the cookie this browser already holds sign it in as this
+team?" - `200` with the team (as `TeamPublic`) if it does. The body is
+nothing the caller couldn't get from `GET /{game_id}/teams`; the status
+code is the point. It exists because the cookie is `HttpOnly`, so the
+join page can't inspect it to decide whether to offer the resume
+shortcut. A `401` here is a normal answer, not an error.
+
 ### `GET /{game_id}/{team_color}/cards`
+
+**Needs that team's cookie** (`401` without it).
 
 Returns the whole deck as `team_color` sees it: claimed cards (any team),
 public-board cards, and that team's own private-board cards whose
@@ -155,6 +248,8 @@ ids start at 1, and a claim aimed at `0` is a `404`. The frontend draws
 them as blacked-out cards counting down to their `visible_from`.
 
 ### `PUT /{game_id}/{team_color}/claim/{card_id}`
+
+**Needs that team's cookie** (`401` without it).
 
 Claims `card_id` for `team_color`, after checking the game has started,
 that the card is visible to that team, and that no discard is outstanding
@@ -182,6 +277,8 @@ and that new card is returned in the response.
 Example: `PUT /ABC123/orange/claim/42?target_card_id=7`
 
 ### `PUT /{game_id}/{team_color}/discard/{card_id}`
+
+**Needs that team's cookie** (`401` without it).
 
 Requires `card_id` to be on the public board and the team's
 `can_discard_card` to be `True` - only the team that is discarding can
@@ -320,6 +417,7 @@ jetlag-api/
 │   ├── challenges.py   # generated: challenge text per card (see below)
 │   ├── schemas.py       # request/response schemas that aren't 1:1 with a table
 │   ├── services.py      # game logic: seeding, random draws, visibility, claim/discard
+│   ├── auth.py          # per-team tokens: generation, comparison, the cookie
 │   ├── routers/
 │   │   ├── __init__.py
 │   │   └── games.py     # the game endpoints
@@ -402,6 +500,18 @@ same slot. That one is hand-drawn rather than generated - there's nothing in
 the KML to derive it from - and `renderCardsPanel()` points at it through
 `CONFIG.WILDCARD_SHAPE_PATH`, the same way it points at an outline.
 
+The reveal at the end of a claim or a discard draws them a second way. The
+card that replaced the one that left is dealt onto the result modal as a card
+in its own right, and its outline inks itself in. That needs a live `<path>`
+rather than a flat mask, so there the SVG is fetched and inlined
+(`GemeenteShapes.fetchOutline()`): the path is given a single dash long enough
+to cover the whole outline and pushed out of sight, and the animation slides
+that dash back into place. Only the browser can measure a path, so
+`traceOutline()` in `js/ui.js` hands the length over to CSS after inserting
+it - along with a stroke width taken from the file's own viewBox, since the
+wild card's star is hand-drawn in a box a tenth the size of a generated
+gemeente's and a flat width would come out ten times as heavy on it.
+
 Shapes are decoration - the card still names its gemeente - so if the index
 fails to load the deck falls back to name-only cards and logs a warning
 rather than taking the board down.
@@ -421,7 +531,6 @@ shapes can't silently drift apart.
 
 - Write the challenges that are still empty (see the importer's report) and
   re-run it.
-- Add auth so one team can't act as another.
 - Consider row-level locking (`SELECT ... FOR UPDATE`, PostgreSQL only)
   around the random-draw queries if you expect concurrent requests for
   the same game - the current code is safe for sequential/typical
