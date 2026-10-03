@@ -156,23 +156,17 @@ const State = {
   },
 
   /**
-   * The gemeentes `wildcardName` can still be played on: the ones it
-   * applies to, minus the ones already claimed. What the target dropdown
-   * on a wild card in the deck offers.
-   *
-   * Empty while /wildcards hasn't landed, which is the honest answer -
-   * without the scopes we don't know what is allowed, and the server
-   * would refuse a guess anyway.
+   * Only used to fill the drop down menu for the wild card claim
+   * modal. It displays every unclaimed gemeente, because the wildcard
+   * overview could technically be incomplete and the player should still
+   * be able to decide to claim any gemeente using this wildcard.
    */
   wildcardTargets(wildcardName) {
-    const scope = this._wildcardGemeentes.get(wildcardName);
-    if (!scope) return [];
     return this.cards
       .filter(
         (c) =>
           !c.is_wild_card &&
-          c.card_state !== "Claimed" &&
-          scope.has(c.card_name),
+          c.card_state !== "Claimed",
       )
       .map((c) => c.card_name)
       .sort((a, b) => a.localeCompare(b));

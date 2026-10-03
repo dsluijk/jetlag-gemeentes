@@ -618,7 +618,7 @@ function appendClaimBlock(wrap, context) {
     hint.className = "modal-field__hint";
     hint.textContent = `Only the ${targets.length} unclaimed ${
       targets.length === 1 ? "gemeente" : "gemeentes"
-    } this card applies to.`;
+    } are displayed.`;
     field.appendChild(label);
     field.appendChild(targetSelect);
     field.appendChild(hint);
