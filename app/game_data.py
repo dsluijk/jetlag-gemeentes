@@ -159,7 +159,6 @@ WILD_CARDS: Dict[str, List[str]] = {
     # "gesloten?" - it is kept here, so drop it if that branch really has
     # closed.
     "Burger King Wild Card": [
-        "Amersfoort",
         "Apeldoorn",
         "Arnhem",
         "Barneveld",
